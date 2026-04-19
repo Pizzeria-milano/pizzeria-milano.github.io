@@ -310,6 +310,17 @@
   .geschlossen-box h3{color:var(--rot);margin-bottom:8px}
 
   /* Kontakt im Hero */
+  .pizza-rest{
+    margin-top:14px;
+    display:inline-flex;align-items:center;gap:8px;
+    padding:8px 16px;border-radius:999px;
+    background:rgba(255,255,255,0.92);color:var(--burgunder);
+    font-family:'Unbounded', sans-serif;font-weight:600;
+    font-size:12px;letter-spacing:1px;text-transform:uppercase;
+  }
+  .pizza-rest.leer{background:rgba(181,26,43,0.92);color:#fff}
+  .pizza-rest.knapp{background:rgba(232,184,96,0.95);color:var(--burgunder)}
+
   .hero-kontakt{
     margin-top:14px;display:flex;gap:18px;justify-content:center;
     flex-wrap:wrap;font-size:13px;position:relative;z-index:2;
@@ -1026,6 +1037,7 @@
       <h2>Benvenuti! 🍕</h2>
       <p id="status-text">Lade…</p>
       <div id="status-badge"></div>
+      <div id="pizza-rest" class="pizza-rest"></div>
       <div id="hero-kontakt" class="hero-kontakt"></div>
     </div>
 
@@ -1189,6 +1201,17 @@
         </div>
         <div style="margin-top:14px">
           <button class="btn-voll" onclick="speichereEinstellungen()">Einstellungen speichern</button>
+        </div>
+      </div>
+
+      <div class="setting-karte">
+        <h3>Maximale Pizzen pro Tag</h3>
+        <p style="font-size:13px;color:var(--grau-leise);margin-bottom:12px">
+          Tagesbegrenzung für die Anzahl verkaufter Pizzen (Kategorie „Pizza"). Kunden sehen live, wie viele noch verfügbar sind. <strong>0 = kein Limit.</strong>
+        </p>
+        <div class="setting-row">
+          <input type="number" id="max-pizzas-input" min="0" step="1" placeholder="z.B. 80" style="flex:1">
+          <button class="btn-klein" onclick="speichereMaxPizzas()">Speichern</button>
         </div>
       </div>
 
@@ -1455,6 +1478,26 @@ function zeigeStatusKunde(){
     ? '<span class="status status-offen">Geöffnet</span>'
     : '<span class="status status-zu">Geschlossen</span>';
 
+  // Verbleibende Pizzen (nur wenn Limit gesetzt & geöffnet)
+  const restEl = document.getElementById('pizza-rest');
+  if(restEl){
+    const max = parseInt(einstellungen.max_pizzas_per_day || 0, 10);
+    if(max && offen){
+      const rest = Math.max(0, max - pizzenHeuteBestellt() - pizzenImWarenkorb());
+      restEl.classList.remove('knapp','leer');
+      if(rest === 0){
+        restEl.classList.add('leer');
+        restEl.textContent = `🍕 Heute ausverkauft`;
+      } else {
+        if(rest <= Math.max(3, Math.round(max * 0.1))) restEl.classList.add('knapp');
+        restEl.textContent = `🍕 Noch ${rest} von ${max} Pizzen heute`;
+      }
+      restEl.style.display = 'inline-flex';
+    } else {
+      restEl.style.display = 'none';
+    }
+  }
+
   // Kontakt im Hero anzeigen
   const kontaktEl = document.getElementById('hero-kontakt');
   const teile = [];
@@ -1533,12 +1576,26 @@ function renderPizzaCtrl(id){
 function setzeMenge(id, neueAnzahl){
   neueAnzahl = Math.max(0, parseInt(neueAnzahl, 10) || 0);
   const idx = warenkorb.findIndex(w => w.id === id);
+  const produkt = menu.find(m => m.id === id);
+
+  // Pizza-Tageslimit prüfen (nur wenn Artikel der Kategorie 'Pizza' hinzukommt)
+  const max = parseInt(einstellungen.max_pizzas_per_day || 0, 10);
+  if(max && produkt && produkt.category === 'Pizza'){
+    const bisherImWK  = idx !== -1 ? warenkorb[idx].anzahl : 0;
+    const deltaPizzen = neueAnzahl - bisherImWK; // kann negativ sein
+    const heuteRest   = Math.max(0, max - pizzenHeuteBestellt() - pizzenImWarenkorb());
+    if(deltaPizzen > heuteRest){
+      neueAnzahl = bisherImWK + heuteRest;
+      toast(heuteRest === 0 ? 'Heute sind keine Pizzen mehr verfügbar' : `Nur noch ${heuteRest} Pizzen heute verfügbar`, 'fehler');
+      if(neueAnzahl === bisherImWK) return;
+    }
+  }
+
   if(neueAnzahl === 0){
     if(idx !== -1) warenkorb.splice(idx, 1);
   } else if(idx === -1){
-    const pizza = menu.find(m => m.id === id);
-    if(!pizza) return;
-    warenkorb.push({id:pizza.id, name:pizza.name, preis:parseFloat(pizza.price), anzahl:neueAnzahl});
+    if(!produkt) return;
+    warenkorb.push({id:produkt.id, name:produkt.name, category:produkt.category, preis:parseFloat(produkt.price), anzahl:neueAnzahl});
   } else {
     warenkorb[idx].anzahl = neueAnzahl;
   }
@@ -1546,8 +1603,37 @@ function setzeMenge(id, neueAnzahl){
   const ctrl = document.getElementById('pctrl-' + id);
   if(ctrl) ctrl.innerHTML = renderPizzaCtrl(id);
   updateWarenkorbAnzeige();
+  zeigeStatusKunde(); // Restkontingent im Hero aktualisieren
   // Wenn Warenkorb-Modal offen ist, auch dort updaten
   if(document.getElementById('wk-modal').classList.contains('aktiv')) zeigeWarenkorbModal();
+}
+
+/* ============================================================
+   PIZZA-LIMIT (max. Pizzen pro Tag)
+   ============================================================ */
+function pizzenHeuteBestellt(){
+  const heute = heutigesDatumISO();
+  const start = new Date(heute + 'T00:00:00');
+  const ende  = new Date(start.getTime() + 24*60*60*1000);
+  return bestellungen
+    .filter(b => { const d = new Date(b.created_at); return d >= start && d < ende; })
+    .flatMap(b => Array.isArray(b.items) ? b.items : [])
+    .filter(i => (i.category || kategorieNachName(i.name)) === 'Pizza')
+    .reduce((s, i) => s + (parseInt(i.anzahl,10) || 0), 0);
+}
+function kategorieNachName(n){
+  const m = menu.find(x => x.name === n);
+  return m ? m.category : null;
+}
+function pizzenImWarenkorb(){
+  return warenkorb
+    .filter(w => w.category === 'Pizza')
+    .reduce((s, w) => s + (w.anzahl || 0), 0);
+}
+function pizzenVerfuegbar(){
+  const max = parseInt(einstellungen.max_pizzas_per_day || 0, 10);
+  if(!max) return null; // kein Limit
+  return Math.max(0, max - pizzenHeuteBestellt() - pizzenImWarenkorb());
 }
 
 /* Kompatibilität: alte Funktionsnamen delegieren */
@@ -1660,13 +1746,27 @@ async function sendeBestellung(){
   if(!tel) { toast('Bitte Telefonnummer eingeben', 'fehler'); return; }
   if(!zeit){ toast('Bitte Abholzeit wählen', 'fehler'); return; }
 
+  // Pizza-Tageslimit final prüfen (inkl. frisch synchronisierter Bestellungen)
+  const max = parseInt(einstellungen.max_pizzas_per_day || 0, 10);
+  if(max){
+    await ladeAlles();
+    const rest = Math.max(0, max - pizzenHeuteBestellt());
+    const imWK = pizzenImWarenkorb();
+    if(imWK > rest){
+      toast(rest === 0 ? 'Heute sind keine Pizzen mehr verfügbar' : `Nur noch ${rest} Pizzen verfügbar`, 'fehler');
+      zeigeStatusKunde();
+      zeigeMenuKunde();
+      return;
+    }
+  }
+
   const summe = warenkorb.reduce((s,w) => s + w.anzahl * w.preis, 0);
 
   const neueBest = await insertOrder({
     customer_name: name,
     customer_phone: tel,
     pickup_time: zeit,
-    items: warenkorb.map(w => ({name:w.name, preis:w.preis, anzahl:w.anzahl})),
+    items: warenkorb.map(w => ({name:w.name, category:w.category, preis:w.preis, anzahl:w.anzahl})),
     total: summe,
     notes: notiz || null,
     status: 'offen',
@@ -1740,6 +1840,7 @@ function zeigeEinstellungen(){
   document.getElementById('paypal-input').value = einstellungen.paypal_link || '';
   document.getElementById('pizzeria-addr-input').value = einstellungen.address || '';
   document.getElementById('pizzeria-tel-input').value = einstellungen.phone || '';
+  document.getElementById('max-pizzas-input').value = einstellungen.max_pizzas_per_day || 0;
 }
 
 async function toggleOffen(){
@@ -1764,6 +1865,16 @@ async function speicherePizzeriaName(){
   const n = document.getElementById('pizzeria-name-input').value.trim();
   await saveSettings({ pizzeria_name: n || 'Pizzeria' });
   toast('Name gespeichert','erfolg');
+}
+
+async function speichereMaxPizzas(){
+  const v = parseInt(document.getElementById('max-pizzas-input').value, 10);
+  const max = isNaN(v) || v < 0 ? 0 : v;
+  await saveSettings({ max_pizzas_per_day: max });
+  document.getElementById('max-pizzas-input').value = max;
+  toast(max ? `Tages-Limit: ${max} Pizzen` : 'Kein Pizza-Limit', 'erfolg');
+  zeigeStatusKunde();
+  zeigeMenuKunde();
 }
 
 async function speichereKontakt(){
