@@ -1383,7 +1383,7 @@ async function starteKunde(){
 function starteMusik(){
   const a = document.getElementById('bg-musik');
   if(!a) return;
-  a.volume = 0.25;          // dezent im Hintergrund
+  a.volume = 0.08;          // sehr dezent im Hintergrund
   const p = a.play();
   if(p && typeof p.catch === 'function'){
     p.catch(() => {
