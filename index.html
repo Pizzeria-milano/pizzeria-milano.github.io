@@ -657,9 +657,8 @@
     border-left:4px solid var(--grau-linie);
     transition:border-color .2s;
   }
-  .best-karte.neu{border-left-color:var(--rot);background:#fff8f5}
-  .best-karte.in_bearbeitung{border-left-color:var(--gold);background:#fffaf0}
-  .best-karte.fertig{border-left-color:var(--gruen);opacity:.75}
+  .best-karte.offen{border-left-color:var(--rot);background:#fff8f5}
+  .best-karte.erledigt{border-left-color:var(--gruen);opacity:.75}
 
   .best-kopf{
     display:flex;justify-content:space-between;align-items:flex-start;
@@ -1079,6 +1078,7 @@
   <div class="admin-wrap">
     <div class="tabs">
       <button class="tab-btn aktiv" data-tab="bestellungen" onclick="zeigeTab(event,'bestellungen')">Bestellungen <span id="neu-anzahl"></span></button>
+      <button class="tab-btn" data-tab="buchhaltung" onclick="zeigeTab(event,'buchhaltung')">Buchhaltung</button>
       <button class="tab-btn" data-tab="einstellungen" onclick="zeigeTab(event,'einstellungen')">Einstellungen</button>
       <button class="tab-btn" data-tab="menu" onclick="zeigeTab(event,'menu')">Speisekarte</button>
     </div>
@@ -1086,9 +1086,8 @@
     <!-- Bestellungen -->
     <div id="tab-bestellungen" class="tab-inhalt aktiv">
       <div class="stat-grid">
-        <div class="stat"><div class="stat-label">Neue Bestellungen</div><div class="stat-wert" id="stat-neu">0</div></div>
-        <div class="stat"><div class="stat-label">In Bearbeitung</div><div class="stat-wert" id="stat-arb">0</div></div>
-        <div class="stat"><div class="stat-label">Offen zu zahlen</div><div class="stat-wert" id="stat-unbezahlt">0,00 €</div></div>
+        <div class="stat"><div class="stat-label">Offen</div><div class="stat-wert" id="stat-offen">0</div></div>
+        <div class="stat"><div class="stat-label">Erledigt</div><div class="stat-wert" id="stat-erledigt">0</div></div>
         <div class="stat"><div class="stat-label">Umsatz <span id="stat-umsatz-label">heute</span></div><div class="stat-wert" id="stat-umsatz">0,00 €</div></div>
       </div>
 
@@ -1100,11 +1099,33 @@
 
       <div class="best-filter">
         <button class="filter-btn aktiv" data-filter="offen" onclick="setzeFilter('offen')">Offen</button>
+        <button class="filter-btn" data-filter="erledigt" onclick="setzeFilter('erledigt')">Erledigt</button>
         <button class="filter-btn" data-filter="alle" onclick="setzeFilter('alle')">Alle</button>
-        <button class="filter-btn" data-filter="fertig" onclick="setzeFilter('fertig')">Fertig</button>
-        <button class="filter-btn" data-filter="unbezahlt" onclick="setzeFilter('unbezahlt')">💳 Unbezahlt</button>
       </div>
       <div class="best-liste" id="best-liste"></div>
+    </div>
+
+    <!-- Buchhaltung -->
+    <div id="tab-buchhaltung" class="tab-inhalt">
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-label">Offen zu zahlen</div><div class="stat-wert" id="buch-unbezahlt">0,00 €</div></div>
+        <div class="stat"><div class="stat-label">Bereits bezahlt</div><div class="stat-wert" id="buch-bezahlt">0,00 €</div></div>
+        <div class="stat"><div class="stat-label">Umsatz <span id="buch-umsatz-label">heute</span></div><div class="stat-wert" id="buch-umsatz">0,00 €</div></div>
+        <div class="stat"><div class="stat-label">Bestellungen</div><div class="stat-wert" id="buch-anzahl">0</div></div>
+      </div>
+
+      <div class="best-datum-wrap">
+        <label for="buch-datum">Datum:</label>
+        <input type="date" id="buch-datum" onchange="zeigeBuchhaltung()">
+        <button class="btn-klein best-datum-heute" onclick="setzeBuchDatumHeute()">Heute</button>
+      </div>
+
+      <div class="best-filter">
+        <button class="filter-btn aktiv" data-buchfilter="unbezahlt" onclick="setzeBuchFilter('unbezahlt')">💳 Unbezahlt</button>
+        <button class="filter-btn" data-buchfilter="bezahlt" onclick="setzeBuchFilter('bezahlt')">✓ Bezahlt</button>
+        <button class="filter-btn" data-buchfilter="alle" onclick="setzeBuchFilter('alle')">Alle</button>
+      </div>
+      <div class="best-liste" id="buch-liste"></div>
     </div>
 
     <!-- Einstellungen -->
@@ -1625,7 +1646,7 @@ async function sendeBestellung(){
     items: warenkorb.map(w => ({name:w.name, preis:w.preis, anzahl:w.anzahl})),
     total: summe,
     notes: notiz || null,
-    status: 'neu',
+    status: 'offen',
     paid: false
   });
   if(!neueBest){ return; }
@@ -1674,6 +1695,7 @@ async function starteAdmin(){
   zeigeEinstellungen();
   zeigeMenuAdmin();
   zeigeBestellungen();
+  zeigeBuchhaltung();
   starteRealtime('admin');
 }
 
@@ -1947,30 +1969,27 @@ function zeigeBestellungen(){
   const tages = bestellungenFuerDatum(datum);
 
   // Statistiken
-  const neu = tages.filter(b => b.status === 'neu').length;
-  const arb = tages.filter(b => b.status === 'in_bearbeitung').length;
-  const umsatz = tages.reduce((s,b) => s + parseFloat(b.total), 0);
-  const unbezahltSumme = tages.filter(b => !b.paid).reduce((s,b) => s + parseFloat(b.total), 0);
+  const offen    = tages.filter(b => b.status === 'offen').length;
+  const erledigt = tages.filter(b => b.status === 'erledigt').length;
+  const umsatz   = tages.reduce((s,b) => s + parseFloat(b.total), 0);
 
-  document.getElementById('stat-neu').textContent = neu;
-  document.getElementById('stat-arb').textContent = arb;
-  document.getElementById('stat-unbezahlt').textContent = formatPreis(unbezahltSumme);
+  document.getElementById('stat-offen').textContent = offen;
+  document.getElementById('stat-erledigt').textContent = erledigt;
   document.getElementById('stat-umsatz').textContent = formatPreis(umsatz);
   document.getElementById('stat-umsatz-label').textContent = istHeute
     ? 'heute'
     : new Date(datum+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
-  document.getElementById('neu-anzahl').textContent = (neu > 0 && istHeute) ? ` (${neu})` : '';
+  document.getElementById('neu-anzahl').textContent = (offen > 0 && istHeute) ? ` (${offen})` : '';
 
   // Filter anwenden
   let liste = tages;
-  if(bestFilter === 'offen')     liste = liste.filter(b => b.status !== 'fertig');
-  if(bestFilter === 'fertig')    liste = liste.filter(b => b.status === 'fertig');
-  if(bestFilter === 'unbezahlt') liste = liste.filter(b => !b.paid);
+  if(bestFilter === 'offen')    liste = liste.filter(b => b.status === 'offen');
+  if(bestFilter === 'erledigt') liste = liste.filter(b => b.status === 'erledigt');
   // bei 'alle' keine Filterung
 
-  // Sortierung
+  // Sortierung: erledigte neueste zuerst, offene nach Abholzeit aufsteigend
   liste = [...liste].sort((a,b) => {
-    if(bestFilter === 'fertig'){
+    if(bestFilter === 'erledigt'){
       return new Date(b.pickup_time) - new Date(a.pickup_time);
     }
     return new Date(a.pickup_time) - new Date(b.pickup_time);
@@ -1990,24 +2009,9 @@ function zeigeBestellungen(){
     `).join('');
     const nr = b.id.substring(0,8).toUpperCase();
 
-    let statusAktionen = '';
-    if(b.status === 'neu'){
-      statusAktionen = `
-        <button class="aktion-btn primary" onclick="updateStatus('${b.id}','in_bearbeitung')">▶ In Bearbeitung</button>
-        <button class="aktion-btn gruen" onclick="updateStatus('${b.id}','fertig')">✓ Direkt fertig</button>
-      `;
-    } else if(b.status === 'in_bearbeitung'){
-      statusAktionen = `
-        <button class="aktion-btn gruen" onclick="updateStatus('${b.id}','fertig')">✓ Fertig</button>
-        <button class="aktion-btn" onclick="updateStatus('${b.id}','neu')">↩ Zurück zu Neu</button>
-      `;
-    } else {
-      statusAktionen = `<button class="aktion-btn" onclick="updateStatus('${b.id}','in_bearbeitung')">↩ Zurück zu In Bearbeitung</button>`;
-    }
-
-    const bezahltBadge = b.paid
-      ? `<span class="bezahlt-badge bezahlt" onclick="togglePaid('${b.id}')" title="Klicken, um als unbezahlt zu markieren">✓ Bezahlt</span>`
-      : `<span class="bezahlt-badge unbezahlt" onclick="togglePaid('${b.id}')" title="Klicken, um als bezahlt zu markieren">💳 Unbezahlt</span>`;
+    const statusAktionen = b.status === 'offen'
+      ? `<button class="aktion-btn gruen" onclick="updateStatus('${b.id}','erledigt')">✓ Als erledigt markieren</button>`
+      : `<button class="aktion-btn" onclick="updateStatus('${b.id}','offen')">↩ Zurück zu offen</button>`;
 
     return `
       <div class="best-karte ${b.status}">
@@ -2019,7 +2023,6 @@ function zeigeBestellungen(){
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
             <div class="best-zeit">Abholung ${abhol}</div>
-            ${bezahltBadge}
           </div>
         </div>
         <div class="best-items"><ul>${items}</ul></div>
@@ -2027,6 +2030,97 @@ function zeigeBestellungen(){
         <div class="best-summe">${formatPreis(b.total)}</div>
         <div class="best-aktionen">
           ${statusAktionen}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============================================================
+   BUCHHALTUNG – Bezahlt-Status
+   ============================================================ */
+let buchFilter = 'unbezahlt';
+
+function gewaehltesBuchDatum(){
+  const el = document.getElementById('buch-datum');
+  return (el && el.value) ? el.value : heutigesDatumISO();
+}
+
+function setzeBuchDatumHeute(){
+  const el = document.getElementById('buch-datum');
+  if(el){ el.value = heutigesDatumISO(); zeigeBuchhaltung(); }
+}
+
+function setzeBuchFilter(f){
+  buchFilter = f;
+  document.querySelectorAll('#tab-buchhaltung .filter-btn').forEach(b => b.classList.toggle('aktiv', b.dataset.buchfilter === f));
+  zeigeBuchhaltung();
+}
+
+function zeigeBuchhaltung(){
+  const datumEl = document.getElementById('buch-datum');
+  if(datumEl && !datumEl.value) datumEl.value = heutigesDatumISO();
+
+  const datum = gewaehltesBuchDatum();
+  const istHeute = datum === heutigesDatumISO();
+  const tages = bestellungenFuerDatum(datum);
+
+  // Statistiken
+  const unbezahltSumme = tages.filter(b => !b.paid).reduce((s,b) => s + parseFloat(b.total), 0);
+  const bezahltSumme   = tages.filter(b =>  b.paid).reduce((s,b) => s + parseFloat(b.total), 0);
+  const umsatz         = tages.reduce((s,b) => s + parseFloat(b.total), 0);
+
+  document.getElementById('buch-unbezahlt').textContent = formatPreis(unbezahltSumme);
+  document.getElementById('buch-bezahlt').textContent   = formatPreis(bezahltSumme);
+  document.getElementById('buch-umsatz').textContent    = formatPreis(umsatz);
+  document.getElementById('buch-anzahl').textContent    = tages.length;
+  document.getElementById('buch-umsatz-label').textContent = istHeute
+    ? 'heute'
+    : new Date(datum+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+
+  // Filter
+  let liste = tages;
+  if(buchFilter === 'unbezahlt') liste = liste.filter(b => !b.paid);
+  if(buchFilter === 'bezahlt')   liste = liste.filter(b =>  b.paid);
+
+  // Sortierung: älteste zuerst bei Unbezahlt, sonst neueste zuerst
+  liste = [...liste].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+
+  const c = document.getElementById('buch-liste');
+  if(liste.length === 0){
+    c.innerHTML = '<div class="best-empty">Keine Bestellungen in dieser Ansicht.</div>';
+    return;
+  }
+
+  c.innerHTML = liste.map(b => {
+    const abhol    = new Date(b.pickup_time).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const erstellt = new Date(b.created_at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const nr = b.id.substring(0,8).toUpperCase();
+    const items = (Array.isArray(b.items) ? b.items : []).map(i => `
+      <li>${i.anzahl}× ${escape(i.name)} <span style="color:var(--grau-leise)">(${formatPreis(i.preis * i.anzahl)})</span></li>
+    `).join('');
+    const bezahltBtn = b.paid
+      ? `<button class="aktion-btn" onclick="togglePaid('${b.id}')">↩ Als unbezahlt markieren</button>`
+      : `<button class="aktion-btn gruen" onclick="togglePaid('${b.id}')">💶 Als bezahlt markieren</button>`;
+    const badge = b.paid
+      ? `<span class="bezahlt-badge bezahlt">✓ Bezahlt</span>`
+      : `<span class="bezahlt-badge unbezahlt">💳 Unbezahlt</span>`;
+
+    return `
+      <div class="best-karte ${b.status}">
+        <div class="best-kopf">
+          <div>
+            <div class="best-kunde">${escape(b.customer_name)}</div>
+            <div class="best-nr">#${nr} · eingegangen ${erstellt} · Abholung ${abhol}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            ${badge}
+          </div>
+        </div>
+        <div class="best-items"><ul>${items}</ul></div>
+        <div class="best-summe">${formatPreis(b.total)}</div>
+        <div class="best-aktionen">
+          ${bezahltBtn}
         </div>
       </div>
     `;
@@ -2046,7 +2140,7 @@ async function togglePaid(id){
   if(!b) return;
   b.paid = !b.paid;
   await updateOrder(id, { paid: b.paid });
-  zeigeBestellungen();
+  zeigeBuchhaltung();
   toast(b.paid ? 'Als bezahlt markiert' : 'Als unbezahlt markiert', 'erfolg');
 }
 
@@ -2096,6 +2190,7 @@ function starteRealtime(rolle){
       if(rolle === 'admin'){
         if(payload.eventType === 'INSERT'){ tonPling(); toast('Neue Bestellung eingegangen!', 'erfolg'); }
         zeigeBestellungen();
+        zeigeBuchhaltung();
       }
     })
     .subscribe();
