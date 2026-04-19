@@ -861,14 +861,37 @@
 
   /* Kleine Bildschirme */
   @media (max-width:600px){
+    .admin-wrap{padding:12px}
     .menu-zeile{grid-template-columns:90px 1fr;gap:8px 10px}
     .menu-zeile > *:nth-child(n+3){grid-column:1 / -1}
     .menu-zeile-kopf{display:none}
     .best-kopf{flex-direction:column;align-items:flex-start}
     .best-kopf > div:last-child{align-items:flex-start !important;flex-direction:row !important;gap:10px !important;flex-wrap:wrap}
     .setting-row label{min-width:auto}
-    .best-datum-wrap{flex-direction:column;align-items:stretch}
-    .best-datum-wrap input[type="date"]{width:100%}
+
+    /* Admin-Tabs: 2x2-Grid statt Horizontal-Scroll */
+    .tabs{
+      display:grid;grid-template-columns:1fr 1fr;gap:4px;
+      overflow:visible;padding:4px;
+    }
+    .tab-btn{
+      flex:unset;min-width:0;
+      padding:10px 8px;font-size:10.5px;letter-spacing:0.5px;
+    }
+
+    /* Datum-Feld einzeilig: [Date-Input] [Heute] */
+    .best-datum-wrap{
+      flex-direction:row;flex-wrap:nowrap;align-items:center;
+      gap:8px;padding:10px 12px;
+    }
+    .best-datum-wrap label{display:none}
+    .best-datum-wrap input[type="date"]{
+      flex:1;min-width:0;width:auto;padding:10px;
+    }
+    .best-datum-wrap .best-datum-heute{
+      flex:0 0 auto;padding:10px 14px;letter-spacing:1px;
+    }
+
     .kategorie-titel{font-size:22px}
   }
 </style>
