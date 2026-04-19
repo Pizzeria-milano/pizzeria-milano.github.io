@@ -1,0 +1,2144 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pizzeria Milano – Online Bestellung</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=Unbounded:wght@500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  /* ============================================
+     DESIGN – warm, italienisch, aufgeräumt
+     ============================================ */
+  :root{
+    --rot:#b51a2b;
+    --rot-dunkel:#7a0f1c;
+    --burgunder:#4a0912;
+    --cream:#fdf6ec;
+    --cream-hell:#faf4e6;
+    --sand:#f4ead7;
+    --sand-dunkel:#e8d9b4;
+    --gold:#c89b3c;
+    --gold-dunkel:#a07b2b;
+    --gruen:#2d6a4f;
+    --holz:#3a2418;
+    --kohle:#1a1008;
+    --grau-text:#2b1a12;
+    --grau-leise:#6b5a4a;
+    --grau-linie:#e8ddc8;
+    --weiss:#ffffff;
+    --schatten:0 4px 20px rgba(74,9,18,0.08);
+    --schatten-stark:0 20px 60px rgba(74,9,18,0.18);
+    --radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background:var(--cream-hell);
+    color:var(--grau-text);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select,textarea{font-family:inherit;font-size:16px}
+  h1,h2,h3{font-weight:700;line-height:1.2}
+
+  /* Demo-Banner */
+  .demo-banner{
+    background:var(--sand);
+    border-bottom:1px solid var(--gold);
+    padding:6px 16px;text-align:center;
+    font-family:'Unbounded', sans-serif;font-size:10px;
+    letter-spacing:2px;color:var(--gold-dunkel);
+    font-weight:600;text-transform:uppercase;
+  }
+
+  /* ============================================
+     LOGIN – im Branding-Stil
+     ============================================ */
+  .login-wrap{
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+    background:
+      radial-gradient(ellipse at top left, rgba(200,155,60,0.22), transparent 55%),
+      radial-gradient(ellipse at bottom right, rgba(181,26,43,0.28), transparent 55%),
+      linear-gradient(180deg, var(--kohle) 0%, var(--burgunder) 100%);
+    position:relative;
+    overflow:hidden;
+  }
+  .login-wrap::before{
+    content:'';
+    position:absolute;inset:0;
+    background-image:
+      radial-gradient(circle at 18% 28%, rgba(255,255,255,0.04) 0%, transparent 40%),
+      radial-gradient(circle at 82% 72%, rgba(255,255,255,0.03) 0%, transparent 40%);
+    pointer-events:none;
+  }
+  .login-card{
+    background:var(--cream-hell);
+    border-radius:20px;
+    padding:44px 38px 32px;
+    max-width:420px;width:100%;
+    box-shadow:var(--schatten-stark), 0 0 0 1px rgba(200,155,60,0.2);
+    text-align:center;
+    position:relative;
+    z-index:2;
+  }
+  /* Dezenter Gold-Rahmen oben */
+  .login-card::before{
+    content:'';
+    position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:60px;height:3px;
+    background:var(--gold);
+    border-radius:0 0 3px 3px;
+  }
+  .login-eyebrow{
+    font-family:'Unbounded', sans-serif;
+    font-size:10px;
+    letter-spacing:4px;
+    text-transform:uppercase;
+    color:var(--gold-dunkel);
+    font-weight:600;
+    margin-bottom:16px;
+  }
+  .login-eyebrow::before,.login-eyebrow::after{
+    content:'—';margin:0 10px;opacity:.5;
+  }
+  .login-logo-wrap{
+    display:flex;justify-content:center;align-items:center;
+    margin-bottom:10px;
+  }
+  .login-logo{
+    width:100%;max-width:320px;height:auto;
+  }
+  .login-tagline{
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    font-size:15px;
+    color:var(--grau-leise);
+    margin-top:-6px;margin-bottom:28px;
+  }
+  .login-trenner{
+    display:flex;align-items:center;gap:12px;
+    margin:0 auto 24px;max-width:240px;
+    color:var(--gold-dunkel);font-weight:600;font-size:11px;
+    letter-spacing:3px;text-transform:uppercase;
+    font-family:'Unbounded', sans-serif;
+  }
+  .login-trenner::before,.login-trenner::after{
+    content:'';flex:1;height:1px;background:var(--sand-dunkel);
+  }
+  .login-card input{
+    width:100%;padding:15px 18px;
+    border:2px solid var(--sand-dunkel);
+    border-radius:var(--radius);
+    outline:none;transition:border-color .2s;
+    text-align:center;font-size:16px;
+    margin-bottom:14px;
+    background:#fff;
+    font-family:'DM Sans',sans-serif;
+    color:var(--burgunder);
+    letter-spacing:0.5px;
+  }
+  .login-card input::placeholder{
+    color:var(--grau-leise);opacity:.65;letter-spacing:0;
+  }
+  .login-card input:focus{
+    border-color:var(--rot);
+    box-shadow:0 0 0 4px rgba(181,26,43,0.08);
+  }
+  .login-card button{
+    width:100%;padding:15px;
+    background:var(--burgunder);color:var(--cream);
+    border-radius:var(--radius);
+    font-weight:700;font-size:15px;
+    letter-spacing:1px;
+    font-family:'Unbounded', sans-serif;
+    text-transform:uppercase;
+    transition:all .2s;
+    cursor:pointer;
+  }
+  .login-card button:hover{
+    background:var(--rot);
+    transform:translateY(-1px);
+    box-shadow:0 6px 16px rgba(74,9,18,0.3);
+  }
+  .login-error{color:var(--rot);font-size:14px;margin-top:12px;min-height:20px;font-weight:500}
+  .login-hint{
+    margin-top:28px;padding:14px 16px;
+    background:var(--sand);
+    border-radius:10px;font-size:12px;
+    color:var(--grau-leise);
+    text-align:left;line-height:1.7;
+    border-left:3px solid var(--gold);
+  }
+  .login-hint strong{color:var(--burgunder);font-weight:600}
+  .login-hint .demo-prefix{
+    display:inline-block;font-family:'Unbounded',sans-serif;
+    font-size:9px;letter-spacing:2px;text-transform:uppercase;
+    color:var(--gold-dunkel);margin-right:6px;
+  }
+
+  /* ============================================
+     HEADER (Kunden + Admin)
+     ============================================ */
+  .header{
+    background:var(--weiss);
+    border-bottom:1px solid var(--grau-linie);
+    padding:14px 20px;
+    display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;z-index:100;
+  }
+  .header-title{font-size:20px;color:var(--rot);font-weight:700;display:flex;align-items:center;gap:8px}
+  .header-logo{height:44px;width:auto;display:block}
+  @media (max-width:480px){
+    .header-logo{height:36px}
+  }
+
+  /* Admin-Header mit Icon + Text */
+  .admin-header-title{display:flex;align-items:center;gap:12px}
+  .admin-header-icon{height:38px;width:38px;display:block;flex-shrink:0}
+  .admin-header-text{display:flex;flex-direction:column;line-height:1.1}
+  .admin-header-name{
+    font-family:'Fraunces', serif;font-weight:900;font-size:22px;
+    color:var(--burgunder);letter-spacing:-0.5px;
+    font-variation-settings:'opsz' 144;
+  }
+  .admin-header-sub{
+    font-family:'Unbounded', sans-serif;font-weight:600;
+    font-size:10px;letter-spacing:2.5px;
+    color:var(--gold-dunkel);text-transform:uppercase;
+  }
+  @media (max-width:480px){
+    .admin-header-icon{height:32px;width:32px}
+    .admin-header-name{font-size:18px}
+  }
+  .header-btns{display:flex;gap:8px}
+  .btn-klein{
+    padding:9px 14px;font-size:11px;border-radius:8px;
+    background:var(--sand);color:var(--burgunder);
+    font-family:'Unbounded', sans-serif;letter-spacing:1.5px;
+    font-weight:600;text-transform:uppercase;
+    transition:all .15s;
+  }
+  .btn-klein:hover{background:var(--sand-dunkel)}
+
+  /* Musik-Button */
+  .btn-musik{
+    display:flex;align-items:center;gap:6px;
+    background:var(--cream);transition:all .2s;
+    font-family:'Unbounded', sans-serif;letter-spacing:1px;
+    font-size:11px;text-transform:uppercase;font-weight:600;
+    color:var(--burgunder);
+  }
+  .btn-musik:hover{background:var(--sand)}
+  .btn-musik.pausiert{background:var(--grau-linie);color:var(--grau-leise)}
+  .btn-musik .musik-note{
+    display:inline-block;transition:transform .3s;
+  }
+  .btn-musik:not(.pausiert) .musik-note{
+    animation:musik-wiegen 1.2s ease-in-out infinite;
+  }
+  @keyframes musik-wiegen{
+    0%,100%{transform:rotate(-8deg)}
+    50%{transform:rotate(8deg)}
+  }
+
+  /* ============================================
+     KUNDEN-BEREICH
+     ============================================ */
+  .kunde-wrap{max-width:900px;margin:0 auto;padding:20px;padding-bottom:120px}
+  .hero{
+    position:relative;
+    background:#3a2418 url('roman-team.jpg') center 22%/cover no-repeat;
+    border-radius:var(--radius);
+    padding:36px 24px;
+    margin-bottom:20px;
+    box-shadow:var(--schatten);
+    text-align:center;
+    min-height:200px;
+    overflow:hidden;
+    color:var(--weiss);
+    display:flex;flex-direction:column;
+    justify-content:center;align-items:center;
+  }
+  .hero::before{
+    content:'';
+    position:absolute;inset:0;
+    background:linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.65) 100%);
+    z-index:1;
+  }
+  .hero > *{position:relative;z-index:2}
+  .hero h2{
+    color:var(--weiss);
+    text-shadow:0 2px 10px rgba(0,0,0,0.7);
+    font-family:'Fraunces', serif;font-weight:900;
+    font-size:34px;letter-spacing:-0.5px;
+    font-variation-settings:'opsz' 144;
+  }
+  .hero #status-text{
+    text-shadow:0 1px 6px rgba(0,0,0,0.8);
+    font-weight:500;margin-top:6px;
+  }
+  .hero .status{
+    backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px);
+  }
+  .hero h2{font-size:22px;margin-bottom:6px;color:var(--rot)}
+  .hero .status{
+    display:inline-block;padding:5px 14px;border-radius:20px;
+    font-family:'Unbounded', sans-serif;font-size:10px;
+    font-weight:600;letter-spacing:2px;text-transform:uppercase;
+    margin-top:10px;
+  }
+  .status-offen{background:#d8f3dc;color:var(--gruen)}
+  .status-zu{background:#ffd6d6;color:var(--rot)}
+
+  .geschlossen-box{
+    background:var(--weiss);
+    border-radius:var(--radius);padding:40px 24px;
+    text-align:center;box-shadow:var(--schatten);
+  }
+  .geschlossen-box .icon{font-size:48px;margin-bottom:12px}
+  .geschlossen-box h3{color:var(--rot);margin-bottom:8px}
+
+  /* Kontakt im Hero */
+  .hero-kontakt{
+    margin-top:14px;display:flex;gap:18px;justify-content:center;
+    flex-wrap:wrap;font-size:13px;position:relative;z-index:2;
+  }
+  .hero-kontakt a,.hero-kontakt span{
+    color:var(--cream);opacity:.9;text-decoration:none;
+    display:inline-flex;align-items:center;gap:6px;
+    text-shadow:0 1px 4px rgba(0,0,0,0.6);
+  }
+  .hero-kontakt a:hover{opacity:1;color:var(--gold)}
+
+  /* Kategorie-Überschriften in Speisekarte */
+  .kategorie-titel{
+    font-family:'Fraunces', serif;
+    font-weight:900;font-size:30px;
+    color:var(--burgunder);
+    margin:32px 4px 16px;
+    display:flex;align-items:center;gap:14px;
+    letter-spacing:-0.5px;
+    font-variation-settings:'opsz' 144;
+    font-style:italic;
+  }
+  .kategorie-titel:first-child{margin-top:10px}
+  .kategorie-titel::before{
+    content:'';width:32px;height:2px;
+    background:var(--gold);flex-shrink:0;
+  }
+  .kategorie-titel::after{
+    content:'';flex:1;height:1px;
+    background:linear-gradient(to right, var(--gold) 0%, transparent 100%);
+    opacity:.5;
+  }
+  .kategorie-icon{font-size:22px;filter:saturate(0.85)}
+  .pizza-liste{display:grid;gap:14px}
+  .pizza-karte{
+    background:var(--weiss);
+    border-radius:var(--radius);
+    padding:18px;
+    display:flex;align-items:center;gap:16px;
+    box-shadow:var(--schatten);
+    transition:transform .15s, box-shadow .15s;
+    border:1px solid transparent;
+  }
+  .pizza-karte:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 24px rgba(74,9,18,0.12);
+    border-color:rgba(200,155,60,0.3);
+  }
+  .pizza-info{flex:1;min-width:0}
+  .pizza-name{
+    font-family:'Fraunces', serif;font-weight:700;
+    font-size:18px;margin-bottom:4px;color:var(--burgunder);
+    font-variation-settings:'opsz' 144;letter-spacing:-0.2px;
+  }
+  .pizza-beschr{font-size:13px;color:var(--grau-leise);margin-bottom:8px;line-height:1.5}
+  .pizza-preis{
+    font-family:'Fraunces', serif;font-weight:900;
+    color:var(--rot);font-size:18px;
+    font-variation-settings:'opsz' 144;letter-spacing:-0.5px;
+  }
+  .pizza-plus{
+    width:42px;height:42px;border-radius:50%;
+    background:var(--burgunder);color:var(--cream);
+    font-size:22px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+    transition:all .15s;
+    box-shadow:0 2px 8px rgba(74,9,18,0.2);
+  }
+  .pizza-plus:hover{transform:scale(1.08);background:var(--rot)}
+  .pizza-plus:disabled{background:var(--grau-linie);cursor:not-allowed;transform:none;box-shadow:none}
+
+  /* Mengen-Steuerung auf Pizza-Karte */
+  .menge-ctrl{
+    display:flex;align-items:center;gap:2px;
+    background:var(--burgunder);border-radius:22px;
+    padding:3px;flex-shrink:0;
+    box-shadow:0 2px 8px rgba(74,9,18,0.25);
+    animation:menge-erscheinen .2s ease-out;
+  }
+  @keyframes menge-erscheinen{
+    from{transform:scale(0.8);opacity:0}
+    to{transform:scale(1);opacity:1}
+  }
+  .menge-btn{
+    width:34px;height:34px;border-radius:50%;
+    color:var(--weiss);
+    font-size:20px;font-weight:700;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .15s;
+    user-select:none;
+  }
+  .menge-btn:hover{background:rgba(255,255,255,0.15)}
+  .menge-btn:active{background:rgba(255,255,255,0.25)}
+  .menge-zahl{
+    min-width:28px;
+    color:var(--weiss);
+    font-weight:700;font-size:16px;
+    text-align:center;user-select:none;
+  }
+
+  /* Pizza-Bild in der Kundenansicht */
+  .pizza-bild{
+    width:90px;height:90px;border-radius:10px;
+    object-fit:cover;flex-shrink:0;background:var(--sand);
+  }
+  @media (max-width:480px){
+    .pizza-bild{width:70px;height:70px}
+  }
+
+  /* Bild-Upload im Admin */
+  .admin-bild-wrap{
+    position:relative;width:70px;height:70px;
+    border-radius:8px;overflow:hidden;
+    background:var(--sand);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    border:2px dashed var(--grau-linie);
+    transition:border-color .2s;
+    flex-shrink:0;
+  }
+  .admin-bild-wrap:hover{border-color:var(--rot)}
+  .admin-bild-wrap img{width:100%;height:100%;object-fit:cover}
+  .admin-bild-wrap.hat-bild{border-style:solid;border-color:transparent}
+  .admin-bild-leer{font-size:12px;color:var(--grau-leise);text-align:center;padding:4px}
+  .admin-bild-leer span{font-size:20px;display:block;margin-bottom:2px}
+  .admin-bild-weg{
+    position:absolute;top:2px;right:2px;
+    width:20px;height:20px;border-radius:50%;
+    background:rgba(0,0,0,0.7);color:#fff;
+    font-size:14px;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .admin-bild-weg:hover{background:var(--rot)}
+
+  /* PayPal-Box im Erfolgs-Screen */
+  .paypal-box{
+    background:#f0f7ff;border:1.5px solid #b8d4f0;
+    border-radius:10px;padding:16px;margin-top:18px;
+    text-align:center;
+  }
+  .paypal-box .hinweis{font-size:13px;color:#2c5282;margin-bottom:10px}
+  .btn-paypal{
+    display:inline-block;width:100%;padding:13px 20px;
+    background:#0070ba;color:#fff;
+    border-radius:8px;font-weight:700;font-size:15px;
+    text-decoration:none;transition:background .2s;
+  }
+  .btn-paypal:hover{background:#005a96}
+
+  /* Warenkorb-Leiste unten */
+  .warenkorb-leiste{
+    position:fixed;bottom:0;left:0;right:0;
+    background:var(--weiss);
+    border-top:1px solid var(--grau-linie);
+    padding:14px 20px;
+    display:flex;align-items:center;justify-content:space-between;
+    box-shadow:0 -4px 20px rgba(0,0,0,0.08);
+    z-index:50;
+  }
+  .wk-info{display:flex;flex-direction:column}
+  .wk-anzahl{
+    font-size:11px;color:var(--grau-leise);
+    font-family:'Unbounded', sans-serif;letter-spacing:1.5px;
+    text-transform:uppercase;font-weight:600;
+  }
+  .wk-summe{
+    font-family:'Fraunces', serif;font-weight:900;
+    font-size:22px;color:var(--burgunder);
+    font-variation-settings:'opsz' 144;letter-spacing:-0.5px;
+  }
+  .wk-btn{
+    padding:12px 22px;background:var(--burgunder);color:var(--cream);
+    border-radius:var(--radius);font-weight:700;font-size:13px;
+    font-family:'Unbounded', sans-serif;letter-spacing:1.5px;
+    text-transform:uppercase;transition:all .2s;
+  }
+  .wk-btn:hover{background:var(--rot);transform:translateY(-1px)}
+  .wk-btn:disabled{background:var(--grau-linie);cursor:not-allowed;transform:none}
+
+  /* Warenkorb-Modal */
+  .modal-bg{
+    position:fixed;inset:0;background:rgba(0,0,0,0.5);
+    z-index:200;display:none;
+    align-items:flex-end;justify-content:center;
+  }
+  .modal-bg.aktiv{display:flex}
+  .modal{
+    background:var(--weiss);
+    width:100%;max-width:600px;
+    border-radius:16px 16px 0 0;
+    max-height:92vh;overflow-y:auto;
+    animation:slideUp .25s ease-out;
+  }
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .modal-head{
+    padding:20px;border-bottom:1px solid var(--grau-linie);
+    display:flex;justify-content:space-between;align-items:center;
+    position:sticky;top:0;background:var(--weiss);z-index:2;
+  }
+  .modal-head h3{
+    font-family:'Fraunces', serif;font-weight:900;
+    font-size:22px;color:var(--burgunder);
+    font-variation-settings:'opsz' 144;letter-spacing:-0.5px;
+  }
+  .modal-schliessen{font-size:26px;color:var(--grau-leise);line-height:1}
+  .modal-body{padding:20px}
+  .modal-body label{display:block;font-weight:600;font-size:14px;margin-bottom:6px;margin-top:14px}
+  .modal-body input,.modal-body select,.modal-body textarea{
+    width:100%;padding:12px 14px;
+    border:1.5px solid var(--grau-linie);
+    border-radius:10px;outline:none;
+    transition:border-color .2s;
+  }
+  .modal-body input:focus,.modal-body select:focus,.modal-body textarea:focus{border-color:var(--rot)}
+  .modal-body textarea{min-height:60px;resize:vertical}
+
+  /* Warenkorb-Items */
+  .wk-item{
+    display:flex;align-items:center;gap:12px;
+    padding:10px 0;border-bottom:1px solid var(--grau-linie);
+  }
+  .wk-item:last-child{border-bottom:none}
+  .wk-item-info{flex:1}
+  .wk-item-name{font-weight:600}
+  .wk-item-preis{font-size:13px;color:var(--grau-leise)}
+  .mengen-ctrl{display:flex;align-items:center;gap:8px}
+  .mengen-btn{
+    width:30px;height:30px;border-radius:50%;
+    background:var(--sand);font-size:16px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .mengen-btn:hover{background:var(--grau-linie)}
+  .mengen-anzahl{min-width:24px;text-align:center;font-weight:600}
+
+  .summe-zeile{display:flex;justify-content:space-between;font-size:18px;font-weight:700}
+
+  .btn-voll{
+    width:100%;padding:14px;
+    background:var(--burgunder);color:var(--cream);
+    border-radius:var(--radius);font-weight:700;font-size:14px;
+    font-family:'Unbounded', sans-serif;letter-spacing:1.5px;
+    text-transform:uppercase;transition:all .2s;
+  }
+  .btn-voll:hover{background:var(--rot);transform:translateY(-1px)}
+  .btn-voll:disabled{background:var(--grau-linie);cursor:not-allowed;transform:none}
+
+  .erfolg-box{
+    text-align:center;padding:30px 20px;
+  }
+  .erfolg-icon{font-size:56px;margin-bottom:10px}
+  .erfolg-box h3{
+    font-family:'Fraunces', serif;font-weight:900;
+    color:var(--gruen);font-size:26px;margin-bottom:10px;
+    font-variation-settings:'opsz' 144;letter-spacing:-0.5px;
+  }
+  .bestellnr{
+    display:inline-block;margin-top:14px;
+    padding:12px 22px;background:var(--sand);
+    border-radius:10px;font-size:18px;font-weight:700;
+    letter-spacing:2px;color:var(--burgunder);
+    font-family:'Courier New', monospace;
+    border:1.5px dashed var(--gold);
+  }
+
+  /* ============================================
+     ADMIN-BEREICH
+     ============================================ */
+  .admin-wrap{max-width:1200px;margin:0 auto;padding:20px}
+  .tabs{
+    display:flex;gap:4px;margin-bottom:20px;
+    background:var(--weiss);padding:4px;
+    border-radius:10px;box-shadow:var(--schatten);
+    overflow-x:auto;
+  }
+  /* Admin-Tabs im Branding */
+  .tab-btn{
+    flex:1;min-width:max-content;
+    padding:12px 18px;font-weight:600;font-size:13px;
+    border-radius:8px;color:var(--grau-leise);
+    white-space:nowrap;transition:all .2s;
+    font-family:'Unbounded', sans-serif;letter-spacing:1px;
+    text-transform:uppercase;
+  }
+  .tab-btn.aktiv{
+    background:var(--burgunder);color:var(--cream);
+    box-shadow:0 2px 8px rgba(74,9,18,0.2);
+  }
+  .tab-btn:not(.aktiv):hover{background:var(--sand)}
+
+  .tab-inhalt{display:none}
+  .tab-inhalt.aktiv{display:block}
+
+  /* Statistik-Kacheln mit Gold-Akzent */
+  .stat{
+    background:var(--weiss);border-radius:var(--radius);
+    padding:18px;box-shadow:var(--schatten);
+    border-top:3px solid var(--gold);
+  }
+  .stat-label{
+    font-size:11px;color:var(--grau-leise);margin-bottom:6px;
+    font-family:'Unbounded', sans-serif;font-weight:600;
+    letter-spacing:2px;text-transform:uppercase;
+  }
+  .stat-wert{
+    font-size:28px;font-weight:900;color:var(--burgunder);
+    font-family:'Fraunces', serif;
+    font-variation-settings:'opsz' 144;letter-spacing:-0.5px;
+  }
+
+  /* Einstellungs-Karten mit Gold-Akzent */
+  .setting-karte{
+    background:var(--weiss);border-radius:var(--radius);
+    padding:22px;margin-bottom:16px;box-shadow:var(--schatten);
+    border-left:3px solid var(--gold);
+  }
+  .setting-karte h3{
+    font-family:'Fraunces', serif;font-weight:700;
+    font-size:18px;margin-bottom:14px;color:var(--burgunder);
+    font-variation-settings:'opsz' 144;
+  }
+
+  /* Bestellungen */
+  .best-filter{
+    display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;
+  }
+  .filter-btn{
+    padding:9px 16px;font-size:11px;font-weight:600;
+    background:var(--weiss);border-radius:20px;
+    border:1.5px solid var(--grau-linie);
+    transition:all .2s;
+    font-family:'Unbounded', sans-serif;letter-spacing:1.5px;
+    text-transform:uppercase;color:var(--grau-leise);
+  }
+  .filter-btn:hover{border-color:var(--gold)}
+  .filter-btn.aktiv{
+    background:var(--burgunder);color:var(--cream);
+    border-color:var(--burgunder);
+  }
+
+  .best-liste{display:grid;gap:14px}
+  .best-karte{
+    background:var(--weiss);border-radius:var(--radius);
+    padding:18px;box-shadow:var(--schatten);
+    border-left:4px solid var(--grau-linie);
+    transition:border-color .2s;
+  }
+  .best-karte.neu{border-left-color:var(--rot);background:#fff8f5}
+  .best-karte.in_bearbeitung{border-left-color:var(--gold);background:#fffaf0}
+  .best-karte.fertig{border-left-color:var(--gruen);opacity:.75}
+
+  .best-kopf{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    gap:10px;margin-bottom:10px;flex-wrap:wrap;
+  }
+  .best-kunde{
+    font-family:'Fraunces', serif;font-weight:700;
+    font-size:18px;color:var(--burgunder);
+    font-variation-settings:'opsz' 144;
+  }
+  .best-tel{font-size:13px;color:var(--grau-leise);text-decoration:none;display:inline-block;margin-top:2px}
+  .best-tel:hover{color:var(--rot)}
+  .best-zeit{
+    font-family:'Unbounded', sans-serif;font-weight:600;
+    font-size:12px;color:var(--burgunder);letter-spacing:1px;
+    background:var(--sand);padding:6px 12px;border-radius:6px;
+    white-space:nowrap;text-transform:uppercase;
+  }
+  .best-nr{
+    font-size:11px;color:var(--grau-leise);font-family:'Courier New', monospace;
+    margin-top:4px;letter-spacing:1px;
+  }
+  .best-items{
+    background:var(--cream-hell);padding:12px 14px;border-radius:8px;
+    margin:12px 0;font-size:14px;
+    border-left:2px solid var(--gold);
+  }
+  .best-items ul{list-style:none}
+  .best-items li{padding:3px 0}
+  .best-notiz{
+    font-size:13px;color:var(--grau-leise);
+    font-style:italic;margin-top:6px;
+    padding:10px 12px;background:#fffbe6;border-radius:6px;
+    border-left:2px solid var(--gold);
+  }
+  .best-summe{
+    font-family:'Fraunces', serif;font-weight:900;font-size:18px;
+    text-align:right;margin-top:8px;color:var(--burgunder);
+    font-variation-settings:'opsz' 144;
+  }
+  .best-aktionen{
+    display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;
+  }
+  .aktion-btn{
+    padding:9px 14px;font-size:11px;font-weight:600;
+    border-radius:8px;background:var(--sand);
+    transition:all .15s;
+    font-family:'Unbounded', sans-serif;letter-spacing:1px;
+    text-transform:uppercase;color:var(--burgunder);
+  }
+  .aktion-btn:hover{background:var(--sand-dunkel);transform:translateY(-1px)}
+  .aktion-btn.primary{background:var(--burgunder);color:var(--cream)}
+  .aktion-btn.primary:hover{background:var(--rot)}
+  .aktion-btn.gruen{background:var(--gruen);color:var(--cream)}
+  .aktion-btn.gruen:hover{background:#1f4d38}
+
+  .best-empty{
+    text-align:center;padding:40px;color:var(--grau-leise);
+    background:var(--weiss);border-radius:var(--radius);
+  }
+
+  /* Datum-Auswahl */
+  .best-datum-wrap{
+    display:flex;align-items:center;gap:10px;
+    margin-bottom:14px;flex-wrap:wrap;
+    background:var(--weiss);padding:12px 16px;border-radius:10px;
+    box-shadow:var(--schatten);border-left:3px solid var(--gold);
+  }
+  .best-datum-wrap label{
+    font-family:'Unbounded', sans-serif;font-weight:600;
+    font-size:11px;color:var(--grau-leise);letter-spacing:2px;
+    text-transform:uppercase;
+  }
+  .best-datum-wrap input[type="date"]{
+    padding:8px 12px;border:1.5px solid var(--grau-linie);
+    border-radius:6px;outline:none;font-family:'DM Sans',sans-serif;
+    color:var(--burgunder);font-weight:500;
+  }
+  .best-datum-wrap input[type="date"]:focus{border-color:var(--rot)}
+
+  /* Bezahlt-Badge */
+  .bezahlt-badge{
+    display:inline-flex;align-items:center;gap:4px;
+    padding:5px 12px;border-radius:12px;
+    font-family:'Unbounded', sans-serif;
+    font-size:10px;font-weight:600;letter-spacing:1.5px;
+    text-transform:uppercase;
+    cursor:pointer;user-select:none;
+    transition:all .15s;
+  }
+  .bezahlt-badge.unbezahlt{
+    background:#fff1e0;color:#b35b00;
+    border:1.5px solid #ffcc80;
+  }
+  .bezahlt-badge.unbezahlt:hover{background:#ffe0bd}
+  .bezahlt-badge.bezahlt{
+    background:#d8f3dc;color:var(--gruen);
+    border:1.5px solid #74c69d;
+  }
+  .bezahlt-badge.bezahlt:hover{background:#b7e4c7}
+
+  .setting-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .setting-row label{font-weight:600;font-size:14px;min-width:140px}
+  .setting-row input,.setting-row select{
+    padding:10px 12px;border:1.5px solid var(--grau-linie);
+    border-radius:8px;outline:none;
+  }
+  .setting-row input:focus,.setting-row select:focus{border-color:var(--rot)}
+
+  /* Umschalter */
+  .toggle-wrap{display:flex;align-items:center;gap:10px}
+  .toggle{
+    position:relative;width:52px;height:28px;
+    background:var(--grau-linie);border-radius:14px;
+    transition:background .2s;cursor:pointer;
+  }
+  .toggle.an{background:var(--gruen)}
+  .toggle-knopf{
+    position:absolute;top:3px;left:3px;
+    width:22px;height:22px;
+    background:var(--weiss);border-radius:50%;
+    transition:transform .2s;
+    box-shadow:0 2px 4px rgba(0,0,0,0.2);
+  }
+  .toggle.an .toggle-knopf{transform:translateX(24px)}
+  .toggle-label{font-weight:600}
+
+  /* Menü-Verwaltung */
+  .menu-tabelle{
+    background:var(--weiss);border-radius:var(--radius);
+    box-shadow:var(--schatten);overflow:hidden;
+  }
+  .menu-zeile{
+    display:grid;grid-template-columns:90px 100px 1fr 100px 80px 100px;
+    gap:10px;align-items:center;padding:12px 16px;
+    border-bottom:1px solid var(--grau-linie);
+  }
+  .menu-zeile:last-child{border-bottom:none}
+  .menu-zeile-kopf{
+    background:var(--sand);font-weight:700;font-size:13px;
+    color:var(--grau-leise);text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+  .menu-zeile input{
+    padding:6px 10px;border:1px solid var(--grau-linie);
+    border-radius:6px;outline:none;width:100%;
+  }
+  .menu-zeile input:focus{border-color:var(--rot)}
+  .menu-aktion{display:flex;gap:6px;justify-content:flex-end}
+  .mini-btn{
+    padding:6px 10px;font-size:12px;font-weight:600;
+    border-radius:6px;background:var(--sand);
+  }
+  .mini-btn.loeschen{background:#ffe0e0;color:var(--rot)}
+  .mini-btn.loeschen:hover{background:#ffc8c8}
+  .menu-neu{
+    padding:14px 16px;background:var(--cream);
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  }
+  .menu-neu input{
+    padding:8px 10px;border:1px solid var(--grau-linie);
+    border-radius:6px;outline:none;
+  }
+
+  .stat-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:12px;margin-bottom:20px;
+  }
+
+  /* Demo-Reset */
+  .demo-reset{
+    background:#fff1f1;border:1px solid #ffcccc;
+    border-radius:var(--radius);padding:16px;
+    margin-top:20px;
+  }
+  .demo-reset h3{color:var(--rot);margin-bottom:8px;font-size:15px}
+  .demo-reset p{font-size:13px;color:var(--grau-leise);margin-bottom:10px}
+  .btn-reset{
+    padding:10px 16px;background:var(--rot);color:var(--weiss);
+    border-radius:8px;font-weight:600;font-size:13px;
+  }
+  .btn-reset:hover{background:var(--rot-dunkel)}
+
+  /* Toast */
+  .toast{
+    position:fixed;bottom:20px;left:50%;
+    transform:translateX(-50%) translateY(100px);
+    background:var(--grau-text);color:var(--weiss);
+    padding:12px 20px;border-radius:10px;
+    box-shadow:var(--schatten-stark);
+    font-weight:600;font-size:14px;
+    transition:transform .3s;z-index:300;
+  }
+  .toast.zeigen{transform:translateX(-50%) translateY(0)}
+  .toast.erfolg{background:var(--gruen)}
+  .toast.fehler{background:var(--rot)}
+
+  /* Verstecken */
+  .hidden{display:none !important}
+
+  /* Kleine Bildschirme */
+  @media (max-width:600px){
+    .menu-zeile{grid-template-columns:90px 1fr;gap:8px 10px}
+    .menu-zeile > *:nth-child(n+3){grid-column:1 / -1}
+    .menu-zeile-kopf{display:none}
+    .best-kopf{flex-direction:column;align-items:flex-start}
+    .best-kopf > div:last-child{align-items:flex-start !important;flex-direction:row !important;gap:10px !important;flex-wrap:wrap}
+    .setting-row label{min-width:auto}
+    .best-datum-wrap{flex-direction:column;align-items:stretch}
+    .best-datum-wrap input[type="date"]{width:100%}
+    .kategorie-titel{font-size:22px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================
+     LOGIN
+     ============================================ -->
+<div id="login" class="login-wrap">
+  <div class="login-card">
+    <div class="login-eyebrow">Online Bestellung</div>
+    <div class="login-logo-wrap">
+      <svg class="login-logo" viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pizzeria Milano">
+        <defs>
+          <radialGradient id="feuer-login" cx="50%" cy="70%" r="80%">
+            <stop offset="0%" stop-color="#e8b860"/>
+            <stop offset="50%" stop-color="#b51a2b"/>
+            <stop offset="100%" stop-color="#0e0805"/>
+          </radialGradient>
+        </defs>
+        <g transform="translate(130, 165)">
+          <rect x="-72" y="40" width="144" height="10" fill="#4a0912"/>
+          <rect x="-80" y="50" width="160" height="6" fill="#7a0f1c"/>
+          <rect x="-60" y="0" width="120" height="40" fill="#4a0912"/>
+          <path d="M -60 0 Q -60 -60 0 -60 Q 60 -60 60 0 Z" fill="#4a0912"/>
+          <g stroke="#2a050a" stroke-width="1" fill="none" opacity=".5">
+            <path d="M -50 -8 Q -50 -48 0 -48 Q 50 -48 50 -8"/>
+            <path d="M -40 -20 Q -40 -40 0 -40 Q 40 -40 40 -20"/>
+            <line x1="-30" y1="0" x2="-30" y2="-38"/>
+            <line x1="0" y1="0" x2="0" y2="-50"/>
+            <line x1="30" y1="0" x2="30" y2="-38"/>
+            <line x1="-15" y1="-8" x2="-15" y2="-46"/>
+            <line x1="15" y1="-8" x2="15" y2="-46"/>
+          </g>
+          <path d="M -28 40 Q -28 -5 0 -5 Q 28 -5 28 40 Z" fill="#0e0805"/>
+          <path d="M -26 40 Q -26 -3 0 -3 Q 26 -3 26 40 Z" fill="url(#feuer-login)"/>
+          <g transform="translate(0, 25)">
+            <path d="M 0 0 C -14 -8 -16 -26 -8 -40 C -3 -32 2 -30 4 -40 C 14 -26 18 -10 4 0 Z" fill="#e8b860"/>
+            <path d="M 0 -4 C -8 -10 -9 -24 -4 -32 C -1 -26 2 -24 3 -30 C 9 -22 11 -12 1 -4 Z" fill="#f4ead7"/>
+          </g>
+          <g transform="translate(0, 40)" fill="#6b4423">
+            <rect x="-18" y="-4" width="10" height="4" rx="1"/>
+            <rect x="-5" y="-4" width="10" height="4" rx="1"/>
+            <rect x="8" y="-4" width="10" height="4" rx="1"/>
+          </g>
+          <g fill="#6b5a4a" opacity=".25">
+            <circle cx="-4" cy="-78" r="4"/>
+            <circle cx="6" cy="-88" r="5"/>
+            <circle cx="-2" cy="-100" r="3"/>
+          </g>
+        </g>
+        <line x1="250" y1="100" x2="250" y2="240" stroke="#c89b3c" stroke-width="1" opacity=".6"/>
+        <g transform="translate(285, 0)">
+          <text x="0" y="118" font-family="Unbounded, sans-serif" font-weight="600" font-size="13" fill="#b51a2b" letter-spacing="6">— PIZZERIA —</text>
+          <text x="0" y="190" font-family="Fraunces, serif" font-weight="900" font-size="80" fill="#4a0912" letter-spacing="-2">Milano</text>
+        </g>
+      </svg>
+    </div>
+    <p class="login-tagline">— forno a legna · MMXXV —</p>
+
+    <div class="login-trenner">Zugang</div>
+
+    <input type="password" id="pw-input" placeholder="Passwort" autocomplete="off">
+    <button id="pw-btn">Weiter</button>
+    <div class="login-error" id="pw-fehler"></div>
+
+    <div class="login-hint">
+      <span class="demo-prefix">Demo</span> Alle Daten werden lokal im Browser gespeichert.<br>
+      <strong>Kunde:</strong> Passwort „Pizza" &nbsp;·&nbsp; <strong>Verwaltung:</strong> Passwort „Verwaltung"
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     KUNDEN-BEREICH
+     ============================================ -->
+<div id="kunde" class="hidden">
+  <audio id="bg-musik" src="die-beste-pizza-der-welt.mp3" loop preload="auto"></audio>
+  <div class="demo-banner">Demo · Live-Daten via Supabase</div>
+  <header class="header">
+    <div class="header-title">
+      <svg class="header-logo" viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pizzeria Milano">
+        <defs>
+          <radialGradient id="feuer-k" cx="50%" cy="70%" r="80%">
+            <stop offset="0%" stop-color="#e8b860"/>
+            <stop offset="50%" stop-color="#b51a2b"/>
+            <stop offset="100%" stop-color="#0e0805"/>
+          </radialGradient>
+        </defs>
+        <g transform="translate(130, 165)">
+          <rect x="-72" y="40" width="144" height="10" fill="#4a0912"/>
+          <rect x="-80" y="50" width="160" height="6" fill="#7a0f1c"/>
+          <rect x="-60" y="0" width="120" height="40" fill="#4a0912"/>
+          <path d="M -60 0 Q -60 -60 0 -60 Q 60 -60 60 0 Z" fill="#4a0912"/>
+          <g stroke="#2a050a" stroke-width="1" fill="none" opacity=".5">
+            <path d="M -50 -8 Q -50 -48 0 -48 Q 50 -48 50 -8"/>
+            <path d="M -40 -20 Q -40 -40 0 -40 Q 40 -40 40 -20"/>
+            <line x1="-30" y1="0" x2="-30" y2="-38"/>
+            <line x1="0" y1="0" x2="0" y2="-50"/>
+            <line x1="30" y1="0" x2="30" y2="-38"/>
+          </g>
+          <path d="M -28 40 Q -28 -5 0 -5 Q 28 -5 28 40 Z" fill="#0e0805"/>
+          <path d="M -26 40 Q -26 -3 0 -3 Q 26 -3 26 40 Z" fill="url(#feuer-k)"/>
+          <g transform="translate(0, 25)">
+            <path d="M 0 0 C -14 -8 -16 -26 -8 -40 C -3 -32 2 -30 4 -40 C 14 -26 18 -10 4 0 Z" fill="#e8b860"/>
+            <path d="M 0 -4 C -8 -10 -9 -24 -4 -32 C -1 -26 2 -24 3 -30 C 9 -22 11 -12 1 -4 Z" fill="#f4ead7"/>
+          </g>
+          <g transform="translate(0, 40)" fill="#6b4423">
+            <rect x="-18" y="-4" width="10" height="4" rx="1"/>
+            <rect x="-5" y="-4" width="10" height="4" rx="1"/>
+            <rect x="8" y="-4" width="10" height="4" rx="1"/>
+          </g>
+        </g>
+        <line x1="250" y1="100" x2="250" y2="240" stroke="#c89b3c" stroke-width="1" opacity=".6"/>
+        <g transform="translate(285, 0)">
+          <text x="0" y="118" font-family="Unbounded, sans-serif" font-weight="600" font-size="13" fill="#b51a2b" letter-spacing="6">— PIZZERIA —</text>
+          <text x="0" y="190" font-family="Fraunces, serif" font-weight="900" font-size="80" fill="#4a0912" letter-spacing="-2">Milano</text>
+        </g>
+      </svg>
+    </div>
+    <div class="header-btns">
+      <button class="btn-klein btn-musik" id="musik-btn" onclick="toggleMusik()" title="Hintergrundmusik an/aus">
+        <span class="musik-note">🎵</span><span id="musik-label">Musik</span>
+      </button>
+      <button class="btn-klein" onclick="ausloggen()">Abmelden</button>
+    </div>
+  </header>
+
+  <div class="kunde-wrap">
+    <div class="hero">
+      <h2>Benvenuti! 🍕</h2>
+      <p id="status-text">Lade…</p>
+      <div id="status-badge"></div>
+      <div id="hero-kontakt" class="hero-kontakt"></div>
+    </div>
+
+    <div id="geschlossen" class="hidden">
+      <div class="geschlossen-box">
+        <div class="icon">🚫</div>
+        <h3>Gerade leider geschlossen</h3>
+        <p>Bestellungen sind aktuell nicht möglich.</p>
+      </div>
+    </div>
+
+    <div id="speisekarte">
+      <div id="speisekarte-inhalt"></div>
+    </div>
+  </div>
+
+  <div class="warenkorb-leiste" id="wk-leiste" style="display:none">
+    <div class="wk-info">
+      <span class="wk-anzahl" id="wk-anzahl">0 Artikel</span>
+      <span class="wk-summe" id="wk-summe">0,00 €</span>
+    </div>
+    <button class="wk-btn" onclick="oeffneWarenkorb()">Weiter zur Kasse</button>
+  </div>
+</div>
+
+<!-- Warenkorb Modal -->
+<div class="modal-bg" id="wk-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Deine Bestellung</h3>
+      <button class="modal-schliessen" onclick="schliesseWarenkorb()">×</button>
+    </div>
+    <div class="modal-body" id="wk-modal-body"></div>
+  </div>
+</div>
+
+<!-- ============================================
+     ADMIN-BEREICH
+     ============================================ -->
+<div id="admin" class="hidden">
+  <div class="demo-banner">Demo · Live-Daten via Supabase</div>
+  <header class="header">
+    <div class="header-title admin-header-title">
+      <svg class="admin-header-icon" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pizzeria Milano">
+        <defs>
+          <radialGradient id="feuer-a" cx="50%" cy="70%" r="80%">
+            <stop offset="0%" stop-color="#e8b860"/>
+            <stop offset="50%" stop-color="#b51a2b"/>
+            <stop offset="100%" stop-color="#0e0805"/>
+          </radialGradient>
+        </defs>
+        <g transform="translate(120, 140)">
+          <rect x="-60" y="0" width="120" height="40" fill="#4a0912"/>
+          <rect x="-72" y="40" width="144" height="10" fill="#4a0912"/>
+          <path d="M -60 0 Q -60 -60 0 -60 Q 60 -60 60 0 Z" fill="#4a0912"/>
+          <path d="M -28 40 Q -28 -5 0 -5 Q 28 -5 28 40 Z" fill="#0e0805"/>
+          <path d="M -26 40 Q -26 -3 0 -3 Q 26 -3 26 40 Z" fill="url(#feuer-a)"/>
+          <g transform="translate(0, 25)">
+            <path d="M 0 0 C -14 -8 -16 -26 -8 -40 C -3 -32 2 -30 4 -40 C 14 -26 18 -10 4 0 Z" fill="#e8b860"/>
+          </g>
+        </g>
+      </svg>
+      <div class="admin-header-text">
+        <span class="admin-header-name">Milano</span>
+        <span class="admin-header-sub">Verwaltung</span>
+      </div>
+    </div>
+    <div class="header-btns">
+      <button class="btn-klein" onclick="ausloggen()">Abmelden</button>
+    </div>
+  </header>
+
+  <div class="admin-wrap">
+    <div class="tabs">
+      <button class="tab-btn aktiv" data-tab="bestellungen" onclick="zeigeTab(event,'bestellungen')">Bestellungen <span id="neu-anzahl"></span></button>
+      <button class="tab-btn" data-tab="einstellungen" onclick="zeigeTab(event,'einstellungen')">Einstellungen</button>
+      <button class="tab-btn" data-tab="menu" onclick="zeigeTab(event,'menu')">Speisekarte</button>
+    </div>
+
+    <!-- Bestellungen -->
+    <div id="tab-bestellungen" class="tab-inhalt aktiv">
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-label">Neue Bestellungen</div><div class="stat-wert" id="stat-neu">0</div></div>
+        <div class="stat"><div class="stat-label">In Bearbeitung</div><div class="stat-wert" id="stat-arb">0</div></div>
+        <div class="stat"><div class="stat-label">Offen zu zahlen</div><div class="stat-wert" id="stat-unbezahlt">0,00 €</div></div>
+        <div class="stat"><div class="stat-label">Umsatz <span id="stat-umsatz-label">heute</span></div><div class="stat-wert" id="stat-umsatz">0,00 €</div></div>
+      </div>
+
+      <div class="best-datum-wrap">
+        <label for="best-datum">Datum:</label>
+        <input type="date" id="best-datum" onchange="aendereBestDatum()">
+        <button class="btn-klein best-datum-heute" onclick="setzeBestDatumHeute()">Heute</button>
+      </div>
+
+      <div class="best-filter">
+        <button class="filter-btn aktiv" data-filter="offen" onclick="setzeFilter('offen')">Offen</button>
+        <button class="filter-btn" data-filter="alle" onclick="setzeFilter('alle')">Alle</button>
+        <button class="filter-btn" data-filter="fertig" onclick="setzeFilter('fertig')">Fertig</button>
+        <button class="filter-btn" data-filter="unbezahlt" onclick="setzeFilter('unbezahlt')">💳 Unbezahlt</button>
+      </div>
+      <div class="best-liste" id="best-liste"></div>
+    </div>
+
+    <!-- Einstellungen -->
+    <div id="tab-einstellungen" class="tab-inhalt">
+      <div class="setting-karte">
+        <h3>Pizzeria geöffnet</h3>
+        <div class="toggle-wrap">
+          <div class="toggle" id="offen-toggle" onclick="toggleOffen()">
+            <div class="toggle-knopf"></div>
+          </div>
+          <span class="toggle-label" id="offen-label">Geschlossen</span>
+        </div>
+        <p style="font-size:13px;color:var(--grau-leise);margin-top:8px">
+          Wenn deaktiviert, sehen Kunden, dass aktuell nicht bestellt werden kann.
+        </p>
+      </div>
+
+      <div class="setting-karte">
+        <h3>Bestellfenster (Abholzeit)</h3>
+        <p style="font-size:13px;color:var(--grau-leise);margin-bottom:12px">
+          In diesem Zeitraum können Kunden Abholzeiten (im 15‑Minuten‑Takt) auswählen.
+        </p>
+        <div class="setting-row">
+          <label>Von:</label>
+          <input type="time" id="zeit-von" step="900">
+          <label>Bis:</label>
+          <input type="time" id="zeit-bis" step="900">
+        </div>
+        <div class="setting-row" style="margin-top:12px">
+          <label>Mindestvorlauf:</label>
+          <select id="vorlauf-select">
+            <option value="15">15 Minuten</option>
+            <option value="20" selected>20 Minuten</option>
+            <option value="30">30 Minuten</option>
+            <option value="45">45 Minuten</option>
+            <option value="60">60 Minuten</option>
+          </select>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn-voll" onclick="speichereEinstellungen()">Einstellungen speichern</button>
+        </div>
+      </div>
+
+      <div class="setting-karte">
+        <h3>Name der Pizzeria</h3>
+        <div class="setting-row">
+          <input type="text" id="pizzeria-name-input" placeholder="z.B. Pizzeria Milano" style="flex:1">
+          <button class="btn-klein" onclick="speicherePizzeriaName()">Speichern</button>
+        </div>
+      </div>
+
+      <div class="setting-karte">
+        <h3>Kontaktdaten (auf Kundenseite sichtbar)</h3>
+        <div class="setting-row" style="margin-bottom:10px">
+          <label>Adresse:</label>
+          <input type="text" id="pizzeria-addr-input" placeholder="Straße Nr, PLZ Ort" style="flex:1;min-width:200px">
+        </div>
+        <div class="setting-row">
+          <label>Telefon:</label>
+          <input type="tel" id="pizzeria-tel-input" placeholder="06253 123456" style="flex:1;min-width:200px">
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn-voll" onclick="speichereKontakt()">Kontaktdaten speichern</button>
+        </div>
+      </div>
+
+      <div class="setting-karte">
+        <h3>PayPal-Zahlung (optional)</h3>
+        <p style="font-size:13px;color:var(--grau-leise);margin-bottom:12px">
+          Wenn eingetragen, bekommt der Kunde nach der Bestellung einen Bezahl-Button angezeigt.
+          Am einfachsten ist ein PayPal.Me-Link – dann wird der Betrag automatisch angehängt.
+        </p>
+        <div class="setting-row">
+          <input type="text" id="paypal-input" placeholder="z.B. https://paypal.me/pizzeriaroma" style="flex:1;min-width:220px">
+          <button class="btn-klein" onclick="speicherePaypal()">Speichern</button>
+        </div>
+        <p style="font-size:12px;color:var(--grau-leise);margin-top:8px">
+          Leer lassen, um die PayPal-Option auszublenden.
+        </p>
+      </div>
+
+      <div class="demo-reset">
+        <h3>🧪 Demo-Daten zurücksetzen</h3>
+        <p>Löscht alle Bestellungen, Einstellungen und Pizzen und legt die Demo-Daten neu an.</p>
+        <button class="btn-reset" onclick="demoReset()">Alle Daten zurücksetzen</button>
+      </div>
+    </div>
+
+    <!-- Menü -->
+    <div id="tab-menu" class="tab-inhalt">
+      <div class="menu-tabelle">
+        <div class="menu-zeile menu-zeile-kopf">
+          <div>Bild</div>
+          <div>Kategorie</div>
+          <div>Name / Beschreibung</div>
+          <div>Preis</div>
+          <div>Verfügbar</div>
+          <div>Aktion</div>
+        </div>
+        <div id="menu-liste"></div>
+        <div class="menu-neu">
+          <select id="neu-kategorie" style="padding:8px 10px;border:1px solid var(--grau-linie);border-radius:6px;outline:none;min-width:120px">
+            <option value="Pizza">Pizza</option>
+            <option value="Salate">Salate</option>
+            <option value="Beilagen">Beilagen</option>
+            <option value="Getränke">Getränke</option>
+            <option value="Desserts">Desserts</option>
+          </select>
+          <input type="text" id="neu-name" placeholder="Name (z.B. Margherita)" style="flex:2;min-width:160px">
+          <input type="text" id="neu-beschr" placeholder="Beschreibung / Zutaten" style="flex:3;min-width:180px">
+          <input type="number" id="neu-preis" placeholder="Preis" step="0.50" min="0" style="width:90px">
+          <button class="btn-klein" style="background:var(--burgunder);color:var(--cream);font-family:'Unbounded',sans-serif;letter-spacing:1px;text-transform:uppercase;font-size:11px" onclick="neuePizza()">+ Hinzufügen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   KONFIGURATION
+   ============================================================ */
+const PW_KUNDE = 'Pizza';
+const PW_ADMIN = 'Verwaltung';
+
+/* ============================================================
+   SUPABASE-VERBINDUNG
+   ============================================================ */
+const SUPABASE_URL     = 'https://ofbperlvsyizjicmljln.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_q4f21uCssB545rw0ogOY6A_xJlpVHE6';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* Tabellen-Namen (mit Prefix, weil geteilte DB) */
+const T_SETTINGS = 'pizzeria_settings';
+const T_MENU     = 'pizzeria_menu';
+const T_ORDERS   = 'pizzeria_orders';
+
+function uuid(){
+  if(crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random()*16|0, v = c==='x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+
+/* ============================================================
+   SUPABASE-HELPER
+   ============================================================ */
+async function saveSettings(patch){
+  Object.assign(einstellungen, patch, { updated_at: new Date().toISOString() });
+  const { error } = await sb.from(T_SETTINGS).update(patch).eq('id', 1);
+  if(error){ toast('Fehler beim Speichern: ' + error.message, 'fehler'); }
+}
+
+async function upsertMenuItem(item){
+  const row = {
+    id: item.id, category: item.category, name: item.name,
+    description: item.description || '', price: item.price,
+    available: item.available, image: item.image || null,
+    sort_order: item.sort_order ?? Date.now()
+  };
+  const { error } = await sb.from(T_MENU).upsert(row);
+  if(error) toast('Fehler: ' + error.message, 'fehler');
+}
+
+async function insertMenuItem(item){
+  const row = {
+    category: item.category, name: item.name,
+    description: item.description || '', price: item.price,
+    available: item.available, sort_order: Date.now()
+  };
+  const { data, error } = await sb.from(T_MENU).insert(row).select().single();
+  if(error){ toast('Fehler: ' + error.message, 'fehler'); return null; }
+  return data;
+}
+
+async function deleteMenuItem(id){
+  const { error } = await sb.from(T_MENU).delete().eq('id', id);
+  if(error) toast('Fehler: ' + error.message, 'fehler');
+}
+
+async function insertOrder(order){
+  const { data, error } = await sb.from(T_ORDERS).insert(order).select().single();
+  if(error){ toast('Fehler: ' + error.message, 'fehler'); return null; }
+  return data;
+}
+
+async function updateOrder(id, patch){
+  const { error } = await sb.from(T_ORDERS).update(patch).eq('id', id);
+  if(error) toast('Fehler: ' + error.message, 'fehler');
+}
+
+/* --- State --- */
+let warenkorb = [];
+let menu = [];
+let einstellungen = {};
+let bestellungen = [];
+let bestFilter = 'offen';
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+document.getElementById('pw-btn').onclick = pruefePW;
+document.getElementById('pw-input').addEventListener('keypress', e => {
+  if(e.key === 'Enter') pruefePW();
+});
+
+function pruefePW(){
+  const pw = document.getElementById('pw-input').value;
+  const fehler = document.getElementById('pw-fehler');
+  if(pw === PW_KUNDE){
+    sessionStorage.setItem('rolle','kunde');
+    starteKunde();
+  } else if(pw === PW_ADMIN){
+    sessionStorage.setItem('rolle','admin');
+    starteAdmin();
+  } else {
+    fehler.textContent = 'Falsches Passwort';
+    document.getElementById('pw-input').value='';
+  }
+}
+
+function ausloggen(){
+  stoppeMusik();
+  if(realtimeKanal){ sb.removeChannel(realtimeKanal); realtimeKanal = null; }
+  sessionStorage.removeItem('rolle');
+  document.getElementById('login').classList.remove('hidden');
+  document.getElementById('kunde').classList.add('hidden');
+  document.getElementById('admin').classList.add('hidden');
+  document.getElementById('pw-input').value='';
+  document.getElementById('pw-fehler').textContent='';
+}
+
+/* ============================================================
+   KUNDE
+   ============================================================ */
+async function starteKunde(){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('kunde').classList.remove('hidden');
+  document.getElementById('admin').classList.add('hidden');
+  warenkorb = [];
+  await ladeAlles();
+  zeigeStatusKunde();
+  zeigeMenuKunde();
+  updateWarenkorbAnzeige();
+  starteMusik();
+  starteRealtime('kunde');
+}
+
+/* ============================================================
+   HINTERGRUNDMUSIK
+   ============================================================ */
+function starteMusik(){
+  const a = document.getElementById('bg-musik');
+  if(!a) return;
+  a.volume = 0.25;          // dezent im Hintergrund
+  const p = a.play();
+  if(p && typeof p.catch === 'function'){
+    p.catch(() => {
+      // Browser hat Autoplay blockiert – Button-Zustand zeigt Pausiert
+      setzeMusikButton(true);
+    });
+  }
+  setzeMusikButton(a.paused);
+}
+
+function toggleMusik(){
+  const a = document.getElementById('bg-musik');
+  if(!a) return;
+  if(a.paused){
+    a.play().catch(() => {});
+    setzeMusikButton(false);
+  } else {
+    a.pause();
+    setzeMusikButton(true);
+  }
+}
+
+function stoppeMusik(){
+  const a = document.getElementById('bg-musik');
+  if(!a) return;
+  a.pause();
+  a.currentTime = 0;
+}
+
+function setzeMusikButton(pausiert){
+  const btn = document.getElementById('musik-btn');
+  const lbl = document.getElementById('musik-label');
+  if(!btn || !lbl) return;
+  btn.classList.toggle('pausiert', pausiert);
+  lbl.textContent = pausiert ? 'Musik aus' : 'Musik';
+}
+
+function zeigeStatusKunde(){
+  const nameEl = document.getElementById('pizzeria-name-k');
+  if(nameEl) nameEl.textContent = einstellungen.pizzeria_name || 'Pizzeria';
+  const offen = einstellungen.is_open;
+  document.getElementById('status-text').textContent = offen
+    ? `Heute von ${einstellungen.order_start_time} bis ${einstellungen.order_end_time}`
+    : 'Aktuell sind keine Bestellungen möglich.';
+  document.getElementById('status-badge').innerHTML = offen
+    ? '<span class="status status-offen">Geöffnet</span>'
+    : '<span class="status status-zu">Geschlossen</span>';
+
+  // Kontakt im Hero anzeigen
+  const kontaktEl = document.getElementById('hero-kontakt');
+  const teile = [];
+  if(einstellungen.address) teile.push(`<span>📍 ${escape(einstellungen.address)}</span>`);
+  if(einstellungen.phone)   teile.push(`<a href="tel:${escape(einstellungen.phone)}">📞 ${escape(einstellungen.phone)}</a>`);
+  kontaktEl.innerHTML = teile.join('');
+
+  document.getElementById('geschlossen').classList.toggle('hidden', offen);
+  document.getElementById('speisekarte').classList.toggle('hidden', !offen);
+  if(!offen) document.getElementById('wk-leiste').style.display='none';
+}
+
+function zeigeMenuKunde(){
+  const container = document.getElementById('speisekarte-inhalt');
+  const verfuegbar = menu.filter(m => m.available);
+  if(verfuegbar.length === 0){
+    container.innerHTML = '<div class="best-empty">Noch keine Speisen auf der Karte.</div>';
+    return;
+  }
+
+  // Nach Kategorien gruppieren (Reihenfolge: Pizza → Salate → Beilagen → Getränke → Desserts → Sonstiges)
+  const reihenfolge = ['Pizza','Salate','Beilagen','Getränke','Desserts'];
+  const gruppen = {};
+  verfuegbar.forEach(p => {
+    const cat = p.category || 'Sonstiges';
+    if(!gruppen[cat]) gruppen[cat] = [];
+    gruppen[cat].push(p);
+  });
+  const sortierteKats = [
+    ...reihenfolge.filter(k => gruppen[k]),
+    ...Object.keys(gruppen).filter(k => !reihenfolge.includes(k))
+  ];
+
+  container.innerHTML = sortierteKats.map(kat => `
+    <h3 class="kategorie-titel">
+      <span class="kategorie-icon">${kategorieIcon(kat)}</span>${escape(kat)}
+    </h3>
+    <div class="pizza-liste">
+      ${gruppen[kat].map(p => `
+        <div class="pizza-karte">
+          ${p.image ? `<img class="pizza-bild" src="${p.image}" alt="${escape(p.name)}">` : ''}
+          <div class="pizza-info">
+            <div class="pizza-name">${escape(p.name)}</div>
+            ${p.description ? `<div class="pizza-beschr">${escape(p.description)}</div>` : ''}
+            <div class="pizza-preis">${formatPreis(p.price)}</div>
+          </div>
+          <div class="pizza-ctrl-wrap" id="pctrl-${p.id}">${renderPizzaCtrl(p.id)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function kategorieIcon(kat){
+  const map = {'Pizza':'🍕','Salate':'🥗','Beilagen':'🍞','Getränke':'🥤','Desserts':'🍰','Sonstiges':'🍽️'};
+  return map[kat] || '🍽️';
+}
+
+/* Rendert entweder Plus-Button oder Minus/Anzahl/Plus-Steuerung */
+function renderPizzaCtrl(id){
+  const imWK = warenkorb.find(w => w.id === id);
+  const anzahl = imWK ? imWK.anzahl : 0;
+  if(anzahl === 0){
+    return `<button class="pizza-plus" onclick="setzeMenge('${id}', 1)" aria-label="Zum Warenkorb hinzufügen">+</button>`;
+  }
+  return `
+    <div class="menge-ctrl" role="group" aria-label="Anzahl ändern">
+      <button class="menge-btn" onclick="setzeMenge('${id}', ${anzahl - 1})" aria-label="Weniger">−</button>
+      <span class="menge-zahl">${anzahl}</span>
+      <button class="menge-btn" onclick="setzeMenge('${id}', ${anzahl + 1})" aria-label="Mehr">+</button>
+    </div>
+  `;
+}
+
+/* Setzt die Menge einer Pizza im Warenkorb absolut */
+function setzeMenge(id, neueAnzahl){
+  neueAnzahl = Math.max(0, parseInt(neueAnzahl, 10) || 0);
+  const idx = warenkorb.findIndex(w => w.id === id);
+  if(neueAnzahl === 0){
+    if(idx !== -1) warenkorb.splice(idx, 1);
+  } else if(idx === -1){
+    const pizza = menu.find(m => m.id === id);
+    if(!pizza) return;
+    warenkorb.push({id:pizza.id, name:pizza.name, preis:parseFloat(pizza.price), anzahl:neueAnzahl});
+  } else {
+    warenkorb[idx].anzahl = neueAnzahl;
+  }
+  // Nur die betroffene Pizza-Steuerung neu rendern (kein Flackern der ganzen Liste)
+  const ctrl = document.getElementById('pctrl-' + id);
+  if(ctrl) ctrl.innerHTML = renderPizzaCtrl(id);
+  updateWarenkorbAnzeige();
+  // Wenn Warenkorb-Modal offen ist, auch dort updaten
+  if(document.getElementById('wk-modal').classList.contains('aktiv')) zeigeWarenkorbModal();
+}
+
+/* Kompatibilität: alte Funktionsnamen delegieren */
+function addZuWK(id){
+  const imWK = warenkorb.find(w => w.id === id);
+  setzeMenge(id, (imWK ? imWK.anzahl : 0) + 1);
+}
+
+function aendereWK(id, delta){
+  const imWK = warenkorb.find(w => w.id === id);
+  setzeMenge(id, (imWK ? imWK.anzahl : 0) + delta);
+}
+
+function updateWarenkorbAnzeige(){
+  const anzahl = warenkorb.reduce((s,w) => s + w.anzahl, 0);
+  const summe = warenkorb.reduce((s,w) => s + w.anzahl * w.preis, 0);
+  document.getElementById('wk-anzahl').textContent = anzahl === 1 ? '1 Artikel' : `${anzahl} Artikel`;
+  document.getElementById('wk-summe').textContent = formatPreis(summe);
+  document.getElementById('wk-leiste').style.display = (anzahl > 0 && einstellungen.is_open) ? 'flex' : 'none';
+}
+
+function oeffneWarenkorb(){
+  if(warenkorb.length === 0) return;
+  document.getElementById('wk-modal').classList.add('aktiv');
+  zeigeWarenkorbModal();
+}
+function schliesseWarenkorb(){ document.getElementById('wk-modal').classList.remove('aktiv'); }
+
+function zeigeWarenkorbModal(){
+  const body = document.getElementById('wk-modal-body');
+  const summe = warenkorb.reduce((s,w) => s + w.anzahl * w.preis, 0);
+  const slots = erzeugeZeitSlots();
+
+  body.innerHTML = `
+    <div>
+      ${warenkorb.map(w => `
+        <div class="wk-item">
+          <div class="wk-item-info">
+            <div class="wk-item-name">${escape(w.name)}</div>
+            <div class="wk-item-preis">${formatPreis(w.preis)} × ${w.anzahl} = ${formatPreis(w.preis * w.anzahl)}</div>
+          </div>
+          <div class="mengen-ctrl">
+            <button class="mengen-btn" onclick="aendereWK('${w.id}',-1)">−</button>
+            <span class="mengen-anzahl">${w.anzahl}</span>
+            <button class="mengen-btn" onclick="aendereWK('${w.id}',1)">+</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="summe-zeile" style="margin-top:14px;padding-top:14px;border-top:2px solid var(--grau-linie)">
+      <span>Gesamtsumme</span><span>${formatPreis(summe)}</span>
+    </div>
+
+    <label for="k-name">Dein Name *</label>
+    <input type="text" id="k-name" placeholder="Max Mustermann">
+
+    <label for="k-tel">Telefonnummer *</label>
+    <input type="tel" id="k-tel" placeholder="0171 1234567">
+
+    <label for="k-zeit">Abholzeit *</label>
+    <select id="k-zeit">
+      ${slots.length === 0
+        ? '<option value="">Keine Zeiten verfügbar</option>'
+        : slots.map(s => `<option value="${s.iso}">${s.label}</option>`).join('')}
+    </select>
+
+    <label for="k-notiz">Anmerkungen (optional)</label>
+    <textarea id="k-notiz" placeholder="z.B. ohne Zwiebeln, extra scharf …"></textarea>
+
+    <div style="margin-top:20px">
+      <button class="btn-voll" id="best-btn" ${slots.length === 0 ? 'disabled' : ''} onclick="sendeBestellung()">
+        Jetzt kostenpflichtig bestellen
+      </button>
+    </div>
+  `;
+}
+
+function erzeugeZeitSlots(){
+  const jetzt = new Date();
+  const vorlauf = parseInt(einstellungen.vorlauf_min || 20, 10);
+  const startLimit = new Date(jetzt.getTime() + vorlauf*60000);
+
+  const [vonH, vonM] = (einstellungen.order_start_time || '11:00').split(':').map(Number);
+  const [bisH, bisM] = (einstellungen.order_end_time   || '22:00').split(':').map(Number);
+  const von = new Date(jetzt); von.setHours(vonH, vonM, 0, 0);
+  const bis = new Date(jetzt); bis.setHours(bisH, bisM, 0, 0);
+
+  let start = new Date(Math.max(von.getTime(), startLimit.getTime()));
+  const minuten = start.getMinutes();
+  const restBis15 = (15 - (minuten % 15)) % 15;
+  if(restBis15 > 0 || start.getSeconds() > 0) start.setMinutes(minuten + (restBis15 || 15), 0, 0);
+
+  const slots = [];
+  for(let t = new Date(start); t <= bis; t = new Date(t.getTime() + 15*60000)){
+    slots.push({
+      iso: t.toISOString(),
+      label: t.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) + ' Uhr'
+    });
+  }
+  return slots;
+}
+
+async function sendeBestellung(){
+  const name = document.getElementById('k-name').value.trim();
+  const tel  = document.getElementById('k-tel').value.trim();
+  const zeit = document.getElementById('k-zeit').value;
+  const notiz= document.getElementById('k-notiz').value.trim();
+
+  if(!name){ toast('Bitte Namen eingeben', 'fehler'); return; }
+  if(!tel) { toast('Bitte Telefonnummer eingeben', 'fehler'); return; }
+  if(!zeit){ toast('Bitte Abholzeit wählen', 'fehler'); return; }
+
+  const summe = warenkorb.reduce((s,w) => s + w.anzahl * w.preis, 0);
+
+  const neueBest = await insertOrder({
+    customer_name: name,
+    customer_phone: tel,
+    pickup_time: zeit,
+    items: warenkorb.map(w => ({name:w.name, preis:w.preis, anzahl:w.anzahl})),
+    total: summe,
+    notes: notiz || null,
+    status: 'neu',
+    paid: false
+  });
+  if(!neueBest){ return; }
+  bestellungen.unshift(neueBest);
+
+  const nr = neueBest.id.substring(0,8).toUpperCase();
+  const abholZeit = new Date(zeit).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const paypalUrl = buildPaypalLink(einstellungen.paypal_link, summe);
+  const paypalHtml = paypalUrl ? `
+      <div class="paypal-box">
+        <div class="hinweis">Du kannst deine Bestellung (${formatPreis(summe)}) direkt per PayPal bezahlen:</div>
+        <a class="btn-paypal" href="${escape(paypalUrl)}" target="_blank" rel="noopener">Jetzt per PayPal bezahlen</a>
+      </div>` : '';
+
+  document.getElementById('wk-modal-body').innerHTML = `
+    <div class="erfolg-box">
+      <div class="erfolg-icon">✅</div>
+      <h3>Bestellung eingegangen!</h3>
+      <p>Danke, ${escape(name)}. Die Pizzeria hat deine Bestellung erhalten.</p>
+      <p style="margin-top:10px">Abholung um <strong>${abholZeit} Uhr</strong></p>
+      <div class="bestellnr">#${nr}</div>
+      <p style="font-size:13px;color:var(--grau-leise);margin-top:14px">
+        Bitte notiere dir die Bestellnummer.
+      </p>
+      ${paypalHtml}
+      <button class="btn-voll" style="margin-top:20px" onclick="schliesseWarenkorb()">Fertig</button>
+    </div>
+  `;
+  warenkorb = [];
+  zeigeMenuKunde();
+  updateWarenkorbAnzeige();
+}
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+async function starteAdmin(){
+  stoppeMusik();
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('kunde').classList.add('hidden');
+  document.getElementById('admin').classList.remove('hidden');
+  await ladeAlles();
+  // Datum-Feld mit heute initialisieren
+  const datumEl = document.getElementById('best-datum');
+  if(datumEl && !datumEl.value) datumEl.value = heutigesDatumISO();
+  zeigeEinstellungen();
+  zeigeMenuAdmin();
+  zeigeBestellungen();
+  starteRealtime('admin');
+}
+
+function zeigeTab(ev, name){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('aktiv'));
+  document.querySelectorAll('.tab-inhalt').forEach(t => t.classList.remove('aktiv'));
+  ev.currentTarget.classList.add('aktiv');
+  document.getElementById('tab-'+name).classList.add('aktiv');
+}
+
+function zeigeEinstellungen(){
+  const t = document.getElementById('offen-toggle');
+  t.classList.toggle('an', einstellungen.is_open);
+  document.getElementById('offen-label').textContent = einstellungen.is_open ? 'Geöffnet' : 'Geschlossen';
+  document.getElementById('zeit-von').value = einstellungen.order_start_time || '11:00';
+  document.getElementById('zeit-bis').value = einstellungen.order_end_time || '22:00';
+  document.getElementById('vorlauf-select').value = einstellungen.vorlauf_min || 20;
+  document.getElementById('pizzeria-name-input').value = einstellungen.pizzeria_name || '';
+  document.getElementById('paypal-input').value = einstellungen.paypal_link || '';
+  document.getElementById('pizzeria-addr-input').value = einstellungen.address || '';
+  document.getElementById('pizzeria-tel-input').value = einstellungen.phone || '';
+}
+
+async function toggleOffen(){
+  const neu = !einstellungen.is_open;
+  await saveSettings({ is_open: neu });
+  zeigeEinstellungen();
+  toast(einstellungen.is_open ? 'Pizzeria ist jetzt geöffnet' : 'Pizzeria ist jetzt geschlossen', 'erfolg');
+}
+
+async function speichereEinstellungen(){
+  const von = document.getElementById('zeit-von').value;
+  const bis = document.getElementById('zeit-bis').value;
+  const vorlauf = parseInt(document.getElementById('vorlauf-select').value, 10);
+  if(!von || !bis){ toast('Bitte Von und Bis ausfüllen','fehler'); return; }
+  if(von >= bis){ toast('Von muss vor Bis liegen','fehler'); return; }
+
+  await saveSettings({ order_start_time: von, order_end_time: bis, vorlauf_min: vorlauf });
+  toast('Einstellungen gespeichert','erfolg');
+}
+
+async function speicherePizzeriaName(){
+  const n = document.getElementById('pizzeria-name-input').value.trim();
+  await saveSettings({ pizzeria_name: n || 'Pizzeria' });
+  toast('Name gespeichert','erfolg');
+}
+
+async function speichereKontakt(){
+  await saveSettings({
+    address: document.getElementById('pizzeria-addr-input').value.trim(),
+    phone:   document.getElementById('pizzeria-tel-input').value.trim()
+  });
+  toast('Kontaktdaten gespeichert','erfolg');
+}
+
+async function speicherePaypal(){
+  let link = document.getElementById('paypal-input').value.trim();
+  if(link && !/^https?:\/\//i.test(link)){
+    // nur Username eingegeben? → paypal.me daraus bauen
+    if(/^[a-zA-Z0-9._-]+$/.test(link)){
+      link = 'https://paypal.me/' + link;
+    } else {
+      link = 'https://' + link;
+    }
+  }
+  await saveSettings({ paypal_link: link });
+  document.getElementById('paypal-input').value = link;
+  toast(link ? 'PayPal-Link gespeichert' : 'PayPal-Link entfernt', 'erfolg');
+}
+
+/* Baut den finalen PayPal-Link inkl. Betrag, falls paypal.me */
+function buildPaypalLink(link, betrag){
+  if(!link) return '';
+  link = link.trim().replace(/\/+$/, '');
+  if(/paypal\.me\//i.test(link)){
+    // evtl. vorhandenen Betrag am Ende entfernen, dann aktuellen Betrag anhängen
+    link = link.replace(/\/\d+([.,]\d+)?([A-Z]{3})?$/i, '');
+    const amount = betrag.toFixed(2);
+    return `${link}/${amount}EUR`;
+  }
+  return link;
+}
+
+/* Öffnet den Dateidialog für ein Pizza-Bild */
+function oeffneDateiDialog(id){
+  document.getElementById('file-' + id).click();
+}
+
+/* Lädt Bild hoch, komprimiert es und speichert Base64 */
+async function bildHochladen(id, ev){
+  const datei = ev.target.files && ev.target.files[0];
+  if(!datei) return;
+  if(!datei.type.startsWith('image/')){
+    toast('Bitte eine Bilddatei wählen','fehler'); return;
+  }
+  try{
+    toast('Bild wird verarbeitet…');
+    const dataUrl = await komprimiereBild(datei, 600, 0.82);
+    const item = menu.find(m => m.id === id);
+    if(!item) return;
+    item.image = dataUrl;
+    await upsertMenuItem(item);
+    zeigeMenuAdmin();
+    toast('Bild hinzugefügt','erfolg');
+  } catch(e){
+    toast('Fehler beim Hochladen: ' + e.message, 'fehler');
+  } finally {
+    ev.target.value = ''; // damit dasselbe Bild nochmal wählbar ist
+  }
+}
+
+async function bildLoeschen(id){
+  const item = menu.find(m => m.id === id);
+  if(!item) return;
+  if(!confirm(`Bild von "${item.name}" entfernen?`)) return;
+  item.image = null;
+  await upsertMenuItem(item);
+  zeigeMenuAdmin();
+  toast('Bild entfernt','erfolg');
+}
+
+/* Komprimiert ein Bild clientseitig auf max. Breite + JPEG-Qualität */
+function komprimiereBild(datei, maxBreite, qualitaet){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Datei nicht lesbar'));
+    reader.onload = e => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Bild nicht ladbar'));
+      img.onload = () => {
+        const ratio = Math.min(1, maxBreite / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff'; // bei transparenten PNGs weiß unterlegen
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', qualitaet));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(datei);
+  });
+}
+
+/* --- Menü verwalten --- */
+function zeigeMenuAdmin(){
+  const c = document.getElementById('menu-liste');
+  if(menu.length === 0){
+    c.innerHTML = '<div style="padding:20px;text-align:center;color:var(--grau-leise)">Noch keine Pizzen angelegt.</div>';
+    return;
+  }
+  c.innerHTML = menu.map(p => `
+    <div class="menu-zeile">
+      <div class="admin-bild-wrap ${p.image ? 'hat-bild' : ''}" onclick="oeffneDateiDialog('${p.id}')">
+        ${p.image
+          ? `<img src="${p.image}" alt=""><button class="admin-bild-weg" onclick="event.stopPropagation(); bildLoeschen('${p.id}')">×</button>`
+          : '<div class="admin-bild-leer"><span>📷</span>Bild<br>wählen</div>'}
+        <input type="file" id="file-${p.id}" accept="image/*" style="display:none" onchange="bildHochladen('${p.id}', event)">
+      </div>
+      <select onchange="updateMenu('${p.id}','category',this.value)" style="padding:6px 10px;border:1px solid var(--grau-linie);border-radius:6px;outline:none;width:100%;background:#fff">
+        <option value="Pizza"    ${(p.category||'Pizza')==='Pizza'?'selected':''}>Pizza</option>
+        <option value="Salate"   ${p.category==='Salate'?'selected':''}>Salate</option>
+        <option value="Beilagen" ${p.category==='Beilagen'?'selected':''}>Beilagen</option>
+        <option value="Getränke" ${p.category==='Getränke'?'selected':''}>Getränke</option>
+        <option value="Desserts" ${p.category==='Desserts'?'selected':''}>Desserts</option>
+      </select>
+      <div>
+        <input type="text" value="${escape(p.name)}" onchange="updateMenu('${p.id}','name',this.value)" placeholder="Name">
+        <input type="text" value="${escape(p.description||'')}" onchange="updateMenu('${p.id}','description',this.value)" placeholder="Beschreibung" style="margin-top:4px">
+      </div>
+      <input type="number" step="0.50" min="0" value="${p.price}" onchange="updateMenu('${p.id}','price',parseFloat(this.value))">
+      <label class="toggle-wrap" style="gap:6px">
+        <div class="toggle ${p.available ? 'an' : ''}" onclick="toggleVerfuegbar('${p.id}')">
+          <div class="toggle-knopf"></div>
+        </div>
+      </label>
+      <div class="menu-aktion">
+        <button class="mini-btn loeschen" onclick="loeschePizza('${p.id}')">Löschen</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function updateMenu(id, feld, wert){
+  const item = menu.find(m => m.id === id);
+  if(!item) return;
+  item[feld] = wert;
+  await upsertMenuItem(item);
+  toast('Gespeichert','erfolg');
+}
+
+async function toggleVerfuegbar(id){
+  const item = menu.find(m => m.id === id);
+  if(!item) return;
+  item.available = !item.available;
+  await upsertMenuItem(item);
+  zeigeMenuAdmin();
+}
+
+async function loeschePizza(id){
+  const item = menu.find(m => m.id === id);
+  if(!confirm(`"${item?.name}" wirklich löschen?`)) return;
+  menu = menu.filter(m => m.id !== id);
+  await deleteMenuItem(id);
+  zeigeMenuAdmin();
+  toast('Gelöscht','erfolg');
+}
+
+async function neuePizza(){
+  const kat   = document.getElementById('neu-kategorie').value;
+  const name  = document.getElementById('neu-name').value.trim();
+  const beschr= document.getElementById('neu-beschr').value.trim();
+  const preis = parseFloat(document.getElementById('neu-preis').value);
+  if(!name || isNaN(preis)){ toast('Name und Preis pflicht','fehler'); return; }
+  const neu = await insertMenuItem({
+    category: kat, name, description: beschr || '', price: preis, available: true
+  });
+  if(neu) menu.push(neu);
+  document.getElementById('neu-name').value='';
+  document.getElementById('neu-beschr').value='';
+  document.getElementById('neu-preis').value='';
+  zeigeMenuAdmin();
+  toast('Artikel hinzugefügt','erfolg');
+}
+
+/* --- Bestellungen --- */
+function setzeFilter(f){
+  bestFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('aktiv', b.dataset.filter === f));
+  zeigeBestellungen();
+}
+
+/* Aktuell gewähltes Datum (Format YYYY-MM-DD) — default: heute */
+function heutigesDatumISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function gewaehltesBestDatum(){
+  const el = document.getElementById('best-datum');
+  return (el && el.value) ? el.value : heutigesDatumISO();
+}
+
+function bestellungenFuerDatum(datumIso){
+  const start = new Date(datumIso + 'T00:00:00');
+  const ende  = new Date(start.getTime() + 24*60*60*1000);
+  return bestellungen.filter(b => {
+    const d = new Date(b.created_at);
+    return d >= start && d < ende;
+  });
+}
+
+function aendereBestDatum(){
+  zeigeBestellungen();
+}
+
+function setzeBestDatumHeute(){
+  const el = document.getElementById('best-datum');
+  if(el){ el.value = heutigesDatumISO(); zeigeBestellungen(); }
+}
+
+function zeigeBestellungen(){
+  // Sicherstellen, dass das Datum-Feld initialisiert ist
+  const datumEl = document.getElementById('best-datum');
+  if(datumEl && !datumEl.value) datumEl.value = heutigesDatumISO();
+
+  const datum = gewaehltesBestDatum();
+  const istHeute = datum === heutigesDatumISO();
+  const tages = bestellungenFuerDatum(datum);
+
+  // Statistiken
+  const neu = tages.filter(b => b.status === 'neu').length;
+  const arb = tages.filter(b => b.status === 'in_bearbeitung').length;
+  const umsatz = tages.reduce((s,b) => s + parseFloat(b.total), 0);
+  const unbezahltSumme = tages.filter(b => !b.paid).reduce((s,b) => s + parseFloat(b.total), 0);
+
+  document.getElementById('stat-neu').textContent = neu;
+  document.getElementById('stat-arb').textContent = arb;
+  document.getElementById('stat-unbezahlt').textContent = formatPreis(unbezahltSumme);
+  document.getElementById('stat-umsatz').textContent = formatPreis(umsatz);
+  document.getElementById('stat-umsatz-label').textContent = istHeute
+    ? 'heute'
+    : new Date(datum+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  document.getElementById('neu-anzahl').textContent = (neu > 0 && istHeute) ? ` (${neu})` : '';
+
+  // Filter anwenden
+  let liste = tages;
+  if(bestFilter === 'offen')     liste = liste.filter(b => b.status !== 'fertig');
+  if(bestFilter === 'fertig')    liste = liste.filter(b => b.status === 'fertig');
+  if(bestFilter === 'unbezahlt') liste = liste.filter(b => !b.paid);
+  // bei 'alle' keine Filterung
+
+  // Sortierung
+  liste = [...liste].sort((a,b) => {
+    if(bestFilter === 'fertig'){
+      return new Date(b.pickup_time) - new Date(a.pickup_time);
+    }
+    return new Date(a.pickup_time) - new Date(b.pickup_time);
+  });
+
+  const c = document.getElementById('best-liste');
+  if(liste.length === 0){
+    c.innerHTML = '<div class="best-empty">Keine Bestellungen in dieser Ansicht.</div>';
+    return;
+  }
+
+  c.innerHTML = liste.map(b => {
+    const abhol = new Date(b.pickup_time).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const erstellt = new Date(b.created_at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const items = (Array.isArray(b.items) ? b.items : []).map(i => `
+      <li>${i.anzahl}× ${escape(i.name)} <span style="color:var(--grau-leise)">(${formatPreis(i.preis * i.anzahl)})</span></li>
+    `).join('');
+    const nr = b.id.substring(0,8).toUpperCase();
+
+    let statusAktionen = '';
+    if(b.status === 'neu'){
+      statusAktionen = `
+        <button class="aktion-btn primary" onclick="updateStatus('${b.id}','in_bearbeitung')">▶ In Bearbeitung</button>
+        <button class="aktion-btn gruen" onclick="updateStatus('${b.id}','fertig')">✓ Direkt fertig</button>
+      `;
+    } else if(b.status === 'in_bearbeitung'){
+      statusAktionen = `
+        <button class="aktion-btn gruen" onclick="updateStatus('${b.id}','fertig')">✓ Fertig</button>
+        <button class="aktion-btn" onclick="updateStatus('${b.id}','neu')">↩ Zurück zu Neu</button>
+      `;
+    } else {
+      statusAktionen = `<button class="aktion-btn" onclick="updateStatus('${b.id}','in_bearbeitung')">↩ Zurück zu In Bearbeitung</button>`;
+    }
+
+    const bezahltBadge = b.paid
+      ? `<span class="bezahlt-badge bezahlt" onclick="togglePaid('${b.id}')" title="Klicken, um als unbezahlt zu markieren">✓ Bezahlt</span>`
+      : `<span class="bezahlt-badge unbezahlt" onclick="togglePaid('${b.id}')" title="Klicken, um als bezahlt zu markieren">💳 Unbezahlt</span>`;
+
+    return `
+      <div class="best-karte ${b.status}">
+        <div class="best-kopf">
+          <div>
+            <div class="best-kunde">${escape(b.customer_name)}</div>
+            <a class="best-tel" href="tel:${escape(b.customer_phone)}">📞 ${escape(b.customer_phone)}</a>
+            <div class="best-nr">#${nr} · eingegangen ${erstellt}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <div class="best-zeit">Abholung ${abhol}</div>
+            ${bezahltBadge}
+          </div>
+        </div>
+        <div class="best-items"><ul>${items}</ul></div>
+        ${b.notes ? `<div class="best-notiz">📝 ${escape(b.notes)}</div>` : ''}
+        <div class="best-summe">${formatPreis(b.total)}</div>
+        <div class="best-aktionen">
+          ${statusAktionen}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function updateStatus(id, neuerStatus){
+  const b = bestellungen.find(x => x.id === id);
+  if(!b) return;
+  b.status = neuerStatus;
+  await updateOrder(id, { status: neuerStatus });
+  zeigeBestellungen();
+}
+
+async function togglePaid(id){
+  const b = bestellungen.find(x => x.id === id);
+  if(!b) return;
+  b.paid = !b.paid;
+  await updateOrder(id, { paid: b.paid });
+  zeigeBestellungen();
+  toast(b.paid ? 'Als bezahlt markiert' : 'Als unbezahlt markiert', 'erfolg');
+}
+
+async function demoReset(){
+  if(!confirm('Wirklich alle Bestellungen von heute löschen? (Einstellungen & Menü bleiben)')) return;
+  const heute = heutigesDatumISO();
+  const start = new Date(heute + 'T00:00:00').toISOString();
+  await sb.from(T_ORDERS).delete().gte('created_at', start);
+  await ladeAlles();
+  zeigeBestellungen();
+  toast('Bestellungen von heute gelöscht','erfolg');
+}
+
+/* ============================================================
+   LADE-FUNKTION (async, lädt aus Supabase)
+   ============================================================ */
+async function ladeAlles(){
+  const [sR, mR, bR] = await Promise.all([
+    sb.from(T_SETTINGS).select('*').eq('id', 1).single(),
+    sb.from(T_MENU).select('*').order('sort_order', { ascending: true }),
+    sb.from(T_ORDERS).select('*').order('created_at', { ascending: false })
+  ]);
+  if(sR.data) einstellungen = sR.data;
+  if(mR.data) menu = mR.data;
+  if(bR.data) bestellungen = bR.data;
+}
+
+/* ============================================================
+   REALTIME – Supabase-Subscription für geräteübergreifende Sync
+   ============================================================ */
+let realtimeKanal = null;
+function starteRealtime(rolle){
+  if(realtimeKanal){ sb.removeChannel(realtimeKanal); realtimeKanal = null; }
+  realtimeKanal = sb.channel('pizzeria-' + rolle)
+    .on('postgres_changes', { event: '*', schema: 'public', table: T_SETTINGS }, async () => {
+      await ladeAlles();
+      if(rolle === 'kunde'){ zeigeStatusKunde(); zeigeMenuKunde(); updateWarenkorbAnzeige(); }
+      else { zeigeEinstellungen(); }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: T_MENU }, async () => {
+      await ladeAlles();
+      if(rolle === 'kunde'){ zeigeMenuKunde(); }
+      else { zeigeMenuAdmin(); }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: T_ORDERS }, async (payload) => {
+      await ladeAlles();
+      if(rolle === 'admin'){
+        if(payload.eventType === 'INSERT'){ tonPling(); toast('Neue Bestellung eingegangen!', 'erfolg'); }
+        zeigeBestellungen();
+      }
+    })
+    .subscribe();
+}
+
+/* ============================================================
+   HILFSFUNKTIONEN
+   ============================================================ */
+function formatPreis(n){
+  return (Number(n)||0).toLocaleString('de-DE',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+}
+function escape(s){
+  if(s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toast(text, typ){
+  const t = document.getElementById('toast');
+  t.textContent = text;
+  t.className = 'toast zeigen ' + (typ || '');
+  setTimeout(() => t.classList.remove('zeigen'), 2800);
+}
+function tonPling(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880; o.type = 'sine';
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+    o.start(); o.stop(ctx.currentTime + 0.45);
+  } catch(e){}
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+window.addEventListener('load', () => {
+  const rolle = sessionStorage.getItem('rolle');
+  if(rolle === 'kunde') starteKunde();
+  else if(rolle === 'admin') starteAdmin();
+});
+</script>
+</body>
+</html>

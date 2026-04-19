@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="80" fill="#b51a2b"/>
+  <rect width="512" height="512" rx="80" fill="url(#hg-grad)" opacity="0.4"/>
+  <defs>
+    <radialGradient id="hg-grad" cx="30%" cy="20%">
+      <stop offset="0%" stop-color="#e8b860" stop-opacity=".8"/>
+      <stop offset="100%" stop-color="#b51a2b" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="feuer-grad-i" cx="50%" cy="70%" r="80%">
+      <stop offset="0%"  stop-color="#f4ead7"/>
+      <stop offset="50%" stop-color="#e8b860"/>
+      <stop offset="100%" stop-color="#0e0805"/>
+    </radialGradient>
+  </defs>
+
+  <g transform="translate(256, 310) scale(2.4)">
+    <rect x="-72" y="40" width="144" height="10" fill="#4a0912"/>
+    <rect x="-80" y="50" width="160" height="6" fill="#2a050a"/>
+    <rect x="-60" y="0" width="120" height="40" fill="#4a0912"/>
+    <path d="M -60 0 Q -60 -60 0 -60 Q 60 -60 60 0 Z" fill="#4a0912"/>
+    <g stroke="#2a050a" stroke-width="1.2" fill="none" opacity=".55">
+      <path d="M -50 -8 Q -50 -48 0 -48 Q 50 -48 50 -8"/>
+      <path d="M -40 -20 Q -40 -40 0 -40 Q 40 -40 40 -20"/>
+      <line x1="-30" y1="0" x2="-30" y2="-38"/>
+      <line x1="0"   y1="0" x2="0"   y2="-50"/>
+      <line x1="30"  y1="0" x2="30"  y2="-38"/>
+      <line x1="-15" y1="-8" x2="-15" y2="-46"/>
+      <line x1="15"  y1="-8" x2="15"  y2="-46"/>
+    </g>
+    <path d="M -28 40 Q -28 -5 0 -5 Q 28 -5 28 40 Z" fill="#0e0805"/>
+    <path d="M -26 40 Q -26 -3 0 -3 Q 26 -3 26 40 Z" fill="url(#feuer-grad-i)"/>
+    <g transform="translate(0, 25)">
+      <path d="M 0 0 C -14 -8 -16 -26 -8 -40 C -3 -32 2 -30 4 -40 C 14 -26 18 -10 4 0 Z" fill="#f4ead7"/>
+      <path d="M 0 -4 C -8 -10 -9 -24 -4 -32 C -1 -26 2 -24 3 -30 C 9 -22 11 -12 1 -4 Z" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>
