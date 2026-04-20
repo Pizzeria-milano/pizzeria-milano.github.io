@@ -1784,7 +1784,7 @@ async function sendeBestellung(){
 
   const nr = neueBest.id.substring(0,8).toUpperCase();
   const abholZeit = new Date(zeit).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-  const paypalUrl = buildPaypalLink(einstellungen.paypal_link, summe, nr);
+  const paypalUrl = buildPaypalLink(einstellungen.paypal_link, summe);
   const paypalHtml = paypalUrl ? `
       <div class="paypal-box">
         <div class="hinweis">Du kannst deine Bestellung (${formatPreis(summe)}) direkt per PayPal bezahlen:</div>
@@ -1919,16 +1919,16 @@ async function speicherePaypal(){
 
 /* Baut den finalen Bezahl-Link inkl. Betrag.
    Unterstützt: E-Mail (→ PayPal xclick, öffnet App), paypal.me-Link und sonstige URLs. */
-function buildPaypalLink(link, betrag, bestellnummer){
+function buildPaypalLink(link, betrag){
   if(!link) return '';
   const amount = Number(betrag || 0).toFixed(2);
 
   // Fall 1: E-Mail → offizieller PayPal-Checkout mit vorausgefülltem Empfänger + Betrag
+  // (ohne item_name/Verwendungszweck – nichts Vorausgefülltes außer Betrag und Empfänger)
   if(EMAIL_REGEX.test(link)){
     const params = new URLSearchParams({
       cmd: '_xclick',
       business: link,
-      item_name: `Pizzeria Milano – Bestellung #${bestellnummer || ''}`.trim(),
       amount: amount,
       currency_code: 'EUR',
       lc: 'DE'
