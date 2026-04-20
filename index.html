@@ -1249,11 +1249,10 @@
       <div class="setting-karte">
         <h3>PayPal-Zahlung (optional)</h3>
         <p style="font-size:13px;color:var(--grau-leise);margin-bottom:12px">
-          Wenn eingetragen, bekommt der Kunde nach der Bestellung einen Bezahl-Button angezeigt.
-          Am einfachsten ist ein PayPal.Me-Link – dann wird der Betrag automatisch angehängt.
+          Trage deine <strong>PayPal-E-Mail</strong> oder einen <strong>PayPal.Me-Link</strong> ein. Nach der Bestellung erhält der Kunde einen Bezahl-Button, der die PayPal-App (bzw. die Webseite) mit Empfänger und Betrag vorausgefüllt öffnet.
         </p>
         <div class="setting-row">
-          <input type="text" id="paypal-input" placeholder="z.B. https://paypal.me/pizzeriaroma" style="flex:1;min-width:220px">
+          <input type="text" id="paypal-input" placeholder="kasse@pizzeria.de  oder  paypal.me/pizzeriaroma" style="flex:1;min-width:220px">
           <button class="btn-klein" onclick="speicherePaypal()">Speichern</button>
         </div>
         <p style="font-size:12px;color:var(--grau-leise);margin-top:8px">
@@ -1785,7 +1784,7 @@ async function sendeBestellung(){
 
   const nr = neueBest.id.substring(0,8).toUpperCase();
   const abholZeit = new Date(zeit).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-  const paypalUrl = buildPaypalLink(einstellungen.paypal_link, summe);
+  const paypalUrl = buildPaypalLink(einstellungen.paypal_link, summe, nr);
   const paypalHtml = paypalUrl ? `
       <div class="paypal-box">
         <div class="hinweis">Du kannst deine Bestellung (${formatPreis(summe)}) direkt per PayPal bezahlen:</div>
@@ -1893,31 +1892,58 @@ async function speichereKontakt(){
   toast('Kontaktdaten gespeichert','erfolg');
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 async function speicherePaypal(){
-  let link = document.getElementById('paypal-input').value.trim();
-  if(link && !/^https?:\/\//i.test(link)){
-    // nur Username eingegeben? → paypal.me daraus bauen
-    if(/^[a-zA-Z0-9._-]+$/.test(link)){
-      link = 'https://paypal.me/' + link;
-    } else {
-      link = 'https://' + link;
+  let v = document.getElementById('paypal-input').value.trim();
+  if(v){
+    if(EMAIL_REGEX.test(v)){
+      // E-Mail → normalisieren (kleinbuchstaben)
+      v = v.toLowerCase();
+    } else if(/paypal\.me\//i.test(v)){
+      // vollständiger paypal.me-Link → normalisieren, evtl. alten Betrag entfernen
+      if(!/^https?:\/\//i.test(v)) v = 'https://' + v;
+      v = v.replace(/\/+$/, '').replace(/\/\d+([.,]\d+)?([A-Z]{3})?$/i, '');
+    } else if(/^[a-zA-Z0-9._-]+$/.test(v)){
+      // reiner Username → paypal.me/username
+      v = 'https://paypal.me/' + v;
+    } else if(!/^https?:\/\//i.test(v)){
+      // sonstige Eingabe ohne Protokoll → vorschalten
+      v = 'https://' + v;
     }
   }
-  await saveSettings({ paypal_link: link });
-  document.getElementById('paypal-input').value = link;
-  toast(link ? 'PayPal-Link gespeichert' : 'PayPal-Link entfernt', 'erfolg');
+  await saveSettings({ paypal_link: v });
+  document.getElementById('paypal-input').value = v;
+  toast(v ? 'PayPal-Einstellung gespeichert' : 'PayPal-Einstellung entfernt', 'erfolg');
 }
 
-/* Baut den finalen PayPal-Link inkl. Betrag, falls paypal.me */
-function buildPaypalLink(link, betrag){
+/* Baut den finalen Bezahl-Link inkl. Betrag.
+   Unterstützt: E-Mail (→ PayPal xclick, öffnet App), paypal.me-Link und sonstige URLs. */
+function buildPaypalLink(link, betrag, bestellnummer){
   if(!link) return '';
-  link = link.trim().replace(/\/+$/, '');
-  if(/paypal\.me\//i.test(link)){
-    // evtl. vorhandenen Betrag am Ende entfernen, dann aktuellen Betrag anhängen
-    link = link.replace(/\/\d+([.,]\d+)?([A-Z]{3})?$/i, '');
-    const amount = betrag.toFixed(2);
-    return `${link}/${amount}EUR`;
+  const amount = Number(betrag || 0).toFixed(2);
+
+  // Fall 1: E-Mail → offizieller PayPal-Checkout mit vorausgefülltem Empfänger + Betrag
+  if(EMAIL_REGEX.test(link)){
+    const params = new URLSearchParams({
+      cmd: '_xclick',
+      business: link,
+      item_name: `Pizzeria Milano – Bestellung #${bestellnummer || ''}`.trim(),
+      amount: amount,
+      currency_code: 'EUR',
+      lc: 'DE'
+    });
+    return 'https://www.paypal.com/cgi-bin/webscr?' + params.toString();
   }
+
+  // Fall 2: paypal.me → Betrag anhängen
+  let l = link.trim().replace(/\/+$/, '');
+  if(/paypal\.me\//i.test(l)){
+    l = l.replace(/\/\d+([.,]\d+)?([A-Z]{3})?$/i, '');
+    return `${l}/${amount}EUR`;
+  }
+
+  // Fall 3: sonstige URL → unverändert durchreichen
   return link;
 }
 
