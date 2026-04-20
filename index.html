@@ -197,9 +197,9 @@
     position:sticky;top:0;z-index:100;
   }
   .header-title{font-size:20px;color:var(--rot);font-weight:700;display:flex;align-items:center;gap:8px}
-  .header-logo{height:44px;width:auto;display:block}
+  .header-logo{height:64px;width:auto;display:block}
   @media (max-width:480px){
-    .header-logo{height:36px}
+    .header-logo{height:52px}
   }
 
   /* Admin-Header mit Icon + Text */
@@ -978,10 +978,6 @@
     <button id="pw-btn">Weiter</button>
     <div class="login-error" id="pw-fehler"></div>
 
-    <div class="login-hint">
-      <span class="demo-prefix">Demo</span> Alle Daten werden lokal im Browser gespeichert.<br>
-      <strong>Kunde:</strong> Passwort „Pizza" &nbsp;·&nbsp; <strong>Verwaltung:</strong> Passwort „Verwaltung"
-    </div>
   </div>
 </div>
 
@@ -990,7 +986,6 @@
      ============================================ -->
 <div id="kunde" class="hidden">
   <audio id="bg-musik" src="die-beste-pizza-der-welt.mp3" loop preload="auto"></audio>
-  <div class="demo-banner">Demo · Live-Daten via Supabase</div>
   <header class="header">
     <div class="header-title">
       <svg class="header-logo" viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pizzeria Milano">
@@ -1042,7 +1037,6 @@
 
   <div class="kunde-wrap">
     <div class="hero">
-      <h2>Benvenuti! 🍕</h2>
       <p id="status-text">Lade…</p>
       <div id="status-badge"></div>
       <div id="pizza-rest" class="pizza-rest"></div>
@@ -1086,7 +1080,6 @@
      ADMIN-BEREICH
      ============================================ -->
 <div id="admin" class="hidden">
-  <div class="demo-banner">Demo · Live-Daten via Supabase</div>
   <header class="header">
     <div class="header-title admin-header-title">
       <svg class="admin-header-icon" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pizzeria Milano">
@@ -1785,10 +1778,11 @@ async function sendeBestellung(){
   const nr = neueBest.id.substring(0,8).toUpperCase();
   const abholZeit = new Date(zeit).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const paypalUrl = buildPaypalLink(einstellungen.paypal_link, summe);
+  const paypalLabel = paypalAnzeigetext(einstellungen.paypal_link);
   const paypalHtml = paypalUrl ? `
       <div class="paypal-box">
-        <div class="hinweis">Du kannst deine Bestellung (${formatPreis(summe)}) direkt per PayPal bezahlen:</div>
-        <a class="btn-paypal" href="${escape(paypalUrl)}" target="_blank" rel="noopener">Jetzt per PayPal bezahlen</a>
+        <div class="hinweis">Du kannst deine Bestellung (${formatPreis(summe)}) direkt per PayPal an folgenden Empfänger senden:</div>
+        <a class="btn-paypal" href="${escape(paypalUrl)}" target="_blank" rel="noopener">${escape(paypalLabel)}</a>
       </div>` : '';
 
   document.getElementById('wk-modal-body').innerHTML = `
@@ -1918,22 +1912,20 @@ async function speicherePaypal(){
 }
 
 /* Baut den finalen Bezahl-Link inkl. Betrag.
-   Unterstützt: E-Mail (→ PayPal xclick, öffnet App), paypal.me-Link und sonstige URLs. */
+   Unterstützt: E-Mail (→ PayPal Send-Money-Deeplink, öffnet App), paypal.me-Link und sonstige URLs.
+   Kein Artikelname, kein Verwendungszweck – nur Empfänger + Betrag + Währung. */
 function buildPaypalLink(link, betrag){
   if(!link) return '';
   const amount = Number(betrag || 0).toFixed(2);
 
-  // Fall 1: E-Mail → offizieller PayPal-Checkout mit vorausgefülltem Empfänger + Betrag
-  // (ohne item_name/Verwendungszweck – nichts Vorausgefülltes außer Betrag und Empfänger)
+  // Fall 1: E-Mail → Send-Money-Deeplink (öffnet PayPal-App / Web mit Empfänger & Betrag)
   if(EMAIL_REGEX.test(link)){
     const params = new URLSearchParams({
-      cmd: '_xclick',
-      business: link,
+      recipient: link,
       amount: amount,
-      currency_code: 'EUR',
-      lc: 'DE'
+      currency: 'EUR'
     });
-    return 'https://www.paypal.com/cgi-bin/webscr?' + params.toString();
+    return 'https://www.paypal.com/myaccount/transfer/homepage/pay?' + params.toString();
   }
 
   // Fall 2: paypal.me → Betrag anhängen
@@ -1945,6 +1937,15 @@ function buildPaypalLink(link, betrag){
 
   // Fall 3: sonstige URL → unverändert durchreichen
   return link;
+}
+
+/* Liefert einen Anzeigetext für den Bezahl-Button: E-Mail, paypal.me-Handle oder Fallback */
+function paypalAnzeigetext(link){
+  if(!link) return '';
+  if(EMAIL_REGEX.test(link)) return link;
+  const m = link.match(/paypal\.me\/([^/?#]+)/i);
+  if(m) return 'paypal.me/' + m[1];
+  return link.replace(/^https?:\/\//i, '').replace(/\/$/, '');
 }
 
 /* Öffnet den Dateidialog für ein Pizza-Bild */
