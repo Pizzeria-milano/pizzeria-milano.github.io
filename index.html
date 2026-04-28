@@ -1377,8 +1377,29 @@ async function deleteMenuItem(id){
 }
 
 async function insertOrder(order){
-  const { data, error } = await sb.from(T_ORDERS).insert(order).select().single();
-  if(error){ toast('Fehler: ' + error.message, 'fehler'); return null; }
+  const { data, error } = await sb.rpc('place_order', {
+    p_customer_name:  order.customer_name,
+    p_customer_phone: order.customer_phone,
+    p_pickup_time:    order.pickup_time,
+    p_items:          order.items,
+    p_total:          order.total,
+    p_notes:          order.notes ?? null
+  });
+  if(error){
+    const m = (error.message || '').match(/PIZZA_LIMIT_EXCEEDED:(\d+):(\d+)/);
+    if(m){
+      const rest = parseInt(m[1], 10);
+      toast(rest === 0
+        ? 'Heute leider ausverkauft – bitte morgen wieder versuchen'
+        : `Nur noch ${rest} Pizzen heute verfügbar – bitte Warenkorb anpassen`, 'fehler');
+      await ladeAlles();
+      zeigeStatusKunde();
+      zeigeMenuKunde();
+    } else {
+      toast('Fehler: ' + error.message, 'fehler');
+    }
+    return null;
+  }
   return data;
 }
 
