@@ -1389,6 +1389,7 @@ function pruefePW(){
     starteKunde();
   } else if(pw === PW_ADMIN){
     sessionStorage.setItem('rolle','admin');
+    audioFreischalten();
     starteAdmin();
   } else {
     fehler.textContent = 'Falsches Passwort';
@@ -1398,6 +1399,7 @@ function pruefePW(){
 
 function ausloggen(){
   stoppeMusik();
+  bestellungenGesehen();
   if(realtimeKanal){ sb.removeChannel(realtimeKanal); realtimeKanal = null; }
   sessionStorage.removeItem('rolle');
   document.getElementById('login').classList.remove('hidden');
@@ -1809,6 +1811,7 @@ async function sendeBestellung(){
    ============================================================ */
 async function starteAdmin(){
   stoppeMusik();
+  bestellungenGesehen();
   document.getElementById('login').classList.add('hidden');
   document.getElementById('kunde').classList.add('hidden');
   document.getElementById('admin').classList.remove('hidden');
@@ -1828,6 +1831,7 @@ function zeigeTab(ev, name){
   document.querySelectorAll('.tab-inhalt').forEach(t => t.classList.remove('aktiv'));
   ev.currentTarget.classList.add('aktiv');
   document.getElementById('tab-'+name).classList.add('aktiv');
+  if(name === 'bestellungen'){ bestellungenGesehen(); }
 }
 
 function zeigeEinstellungen(){
@@ -2357,7 +2361,12 @@ function starteRealtime(rolle){
     .on('postgres_changes', { event: '*', schema: 'public', table: T_ORDERS }, async (payload) => {
       await ladeAlles();
       if(rolle === 'admin'){
-        if(payload.eventType === 'INSERT'){ tonPling(); toast('Neue Bestellung eingegangen!', 'erfolg'); }
+        if(payload.eventType === 'INSERT'){
+          tonPling();
+          toast('Neue Bestellung eingegangen!', 'erfolg');
+          ungeleseneBestellungen++;
+          aktualisiereTitel();
+        }
         zeigeBestellungen();
         zeigeBuchhaltung();
       }
@@ -2381,19 +2390,67 @@ function toast(text, typ){
   t.className = 'toast zeigen ' + (typ || '');
   setTimeout(() => t.classList.remove('zeigen'), 2800);
 }
-function tonPling(){
+let audioCtx = null;
+function audioFreischalten(){
   try{
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.frequency.value = 880; o.type = 'sine';
-    g.gain.setValueAtTime(0.0001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
-    o.start(); o.stop(ctx.currentTime + 0.45);
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
   } catch(e){}
 }
+function tonPling(){
+  try{
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
+    const ctx = audioCtx;
+    const t0 = ctx.currentTime;
+    const toene = [
+      { freq: 523.25, start: 0.00 },
+      { freq: 659.25, start: 0.18 },
+      { freq: 783.99, start: 0.36 }
+    ];
+    toene.forEach(({freq, start}) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sine';
+      o.frequency.value = freq;
+      const s = t0 + start;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.5, s + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + 0.7);
+      o.start(s);
+      o.stop(s + 0.75);
+    });
+  } catch(e){}
+}
+
+const ORIG_TITEL = 'Pizzeria Milano – Online Bestellung';
+let ungeleseneBestellungen = 0;
+function aktualisiereTitel(){
+  if(ungeleseneBestellungen > 0){
+    document.title = `🔔 (${ungeleseneBestellungen}) Neue Bestellung – Pizzeria Milano`;
+  } else {
+    document.title = ORIG_TITEL;
+  }
+}
+function bestellungenGesehen(){
+  if(ungeleseneBestellungen !== 0){
+    ungeleseneBestellungen = 0;
+    aktualisiereTitel();
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible'){
+    const aktiverTab = document.querySelector('.tab-btn.aktiv');
+    if(sessionStorage.getItem('rolle') === 'admin' && aktiverTab && aktiverTab.dataset.tab === 'bestellungen'){
+      bestellungenGesehen();
+    }
+  }
+});
 
 /* ============================================================
    START
