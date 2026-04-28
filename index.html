@@ -1242,10 +1242,11 @@
       <div class="setting-karte">
         <h3>PayPal-Zahlung (optional)</h3>
         <p style="font-size:13px;color:var(--grau-leise);margin-bottom:12px">
-          Trage deine <strong>PayPal-E-Mail</strong> oder einen <strong>PayPal.Me-Link</strong> ein. Nach der Bestellung erhält der Kunde einen Bezahl-Button, der die PayPal-App (bzw. die Webseite) mit Empfänger und Betrag vorausgefüllt öffnet.
+          Trage deinen <strong>PayPal.Me-Link</strong> oder PayPal-Handle ein (z.&nbsp;B. <code>paypal.me/romanfroese</code>, <code>romanfroese</code> oder <code>@romanfroese</code>). Nach der Bestellung erhält der Kunde einen Bezahl-Button, der die PayPal-App mit Empfänger und Betrag vorausgefüllt öffnet.<br>
+          <em>Hinweis:</em> Reine E-Mail-Adressen funktionieren bei PayPal nicht mehr für Direktzahlungen.
         </p>
         <div class="setting-row">
-          <input type="text" id="paypal-input" placeholder="kasse@pizzeria.de  oder  paypal.me/pizzeriaroma" style="flex:1;min-width:220px">
+          <input type="text" id="paypal-input" placeholder="paypal.me/romanfroese  oder  @romanfroese" style="flex:1;min-width:220px">
           <button class="btn-klein" onclick="speicherePaypal()">Speichern</button>
         </div>
         <p style="font-size:12px;color:var(--grau-leise);margin-top:8px">
@@ -1896,17 +1897,16 @@ async function speicherePaypal(){
   let v = document.getElementById('paypal-input').value.trim();
   if(v){
     if(EMAIL_REGEX.test(v)){
-      // E-Mail → normalisieren (kleinbuchstaben)
-      v = v.toLowerCase();
-    } else if(/paypal\.me\//i.test(v)){
-      // vollständiger paypal.me-Link → normalisieren, evtl. alten Betrag entfernen
+      toast('E-Mail-Adressen werden von PayPal nicht mehr für Direktzahlungen unterstützt. Bitte einen paypal.me-Link verwenden.', 'fehler');
+      return;
+    }
+    v = v.replace(/^@/, '');
+    if(/paypal\.me\//i.test(v)){
       if(!/^https?:\/\//i.test(v)) v = 'https://' + v;
       v = v.replace(/\/+$/, '').replace(/\/\d+([.,]\d+)?([A-Z]{3})?$/i, '');
     } else if(/^[a-zA-Z0-9._-]+$/.test(v)){
-      // reiner Username → paypal.me/username
       v = 'https://paypal.me/' + v;
     } else if(!/^https?:\/\//i.test(v)){
-      // sonstige Eingabe ohne Protokoll → vorschalten
       v = 'https://' + v;
     }
   }
@@ -1916,30 +1916,19 @@ async function speicherePaypal(){
 }
 
 /* Baut den finalen Bezahl-Link inkl. Betrag.
-   Unterstützt: E-Mail (→ PayPal Send-Money-Deeplink, öffnet App), paypal.me-Link und sonstige URLs.
-   Kein Artikelname, kein Verwendungszweck – nur Empfänger + Betrag + Währung. */
+   Unterstützt: paypal.me-Link (Empfänger + Betrag + Währung) und sonstige URLs.
+   Reine E-Mail-Adressen werden ignoriert (PayPal unterstützt dafür keinen Direktzahlungs-Deeplink mehr). */
 function buildPaypalLink(link, betrag){
   if(!link) return '';
+  if(EMAIL_REGEX.test(link)) return '';
   const amount = Number(betrag || 0).toFixed(2);
 
-  // Fall 1: E-Mail → Send-Money-Deeplink (öffnet PayPal-App / Web mit Empfänger & Betrag)
-  if(EMAIL_REGEX.test(link)){
-    const params = new URLSearchParams({
-      recipient: link,
-      amount: amount,
-      currency: 'EUR'
-    });
-    return 'https://www.paypal.com/myaccount/transfer/homepage/pay?' + params.toString();
-  }
-
-  // Fall 2: paypal.me → Betrag anhängen
   let l = link.trim().replace(/\/+$/, '');
   if(/paypal\.me\//i.test(l)){
     l = l.replace(/\/\d+([.,]\d+)?([A-Z]{3})?$/i, '');
     return `${l}/${amount}EUR`;
   }
 
-  // Fall 3: sonstige URL → unverändert durchreichen
   return link;
 }
 
