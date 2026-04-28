@@ -309,17 +309,36 @@
   .geschlossen-box .icon{font-size:48px;margin-bottom:12px}
   .geschlossen-box h3{color:var(--rot);margin-bottom:8px}
 
-  /* Kontakt im Hero */
+  /* Pizza-Verfügbarkeits-Banner – unter dem Hero */
   .pizza-rest{
-    margin-top:14px;
-    display:inline-flex;align-items:center;gap:8px;
-    padding:8px 16px;border-radius:999px;
-    background:rgba(255,255,255,0.92);color:var(--burgunder);
+    margin:18px auto 8px;max-width:560px;
+    display:flex;align-items:center;justify-content:center;gap:12px;
+    padding:14px 22px;border-radius:14px;
+    background:linear-gradient(135deg, var(--cream), #f7ecd9);
+    border:2px solid var(--gold);
+    box-shadow:0 2px 14px rgba(0,0,0,0.08);
+    color:var(--burgunder);
     font-family:'Unbounded', sans-serif;font-weight:600;
-    font-size:12px;letter-spacing:1px;text-transform:uppercase;
+    font-size:15px;letter-spacing:.5px;
+    text-align:center;
+    transition:background .25s, border-color .25s;
   }
-  .pizza-rest.leer{background:rgba(181,26,43,0.92);color:#fff}
-  .pizza-rest.knapp{background:rgba(232,184,96,0.95);color:var(--burgunder)}
+  .pizza-rest .zahl{font-size:22px;color:var(--rot);font-weight:700}
+  .pizza-rest.knapp{
+    background:linear-gradient(135deg, #fff5d8, #ffe8a8);
+    border-color:var(--gold);
+  }
+  .pizza-rest.leer{
+    background:linear-gradient(135deg, var(--rot), var(--burgunder));
+    border-color:var(--burgunder);
+    color:#fff;
+  }
+  .pizza-rest.leer .zahl{color:#fff}
+  .pizza-rest.hidden{display:none}
+  @media(max-width:600px){
+    .pizza-rest{margin:12px 14px 6px;font-size:14px;padding:12px 16px}
+    .pizza-rest .zahl{font-size:20px}
+  }
 
   .hero-kontakt{
     margin-top:14px;display:flex;gap:18px;justify-content:center;
@@ -1039,9 +1058,10 @@
     <div class="hero">
       <p id="status-text">Lade…</p>
       <div id="status-badge"></div>
-      <div id="pizza-rest" class="pizza-rest"></div>
       <div id="hero-kontakt" class="hero-kontakt"></div>
     </div>
+
+    <div id="pizza-rest" class="pizza-rest hidden"></div>
 
     <div id="geschlossen" class="hidden">
       <div class="geschlossen-box">
@@ -1487,17 +1507,16 @@ function zeigeStatusKunde(){
     const max = parseInt(einstellungen.max_pizzas_per_day || 0, 10);
     if(max && offen){
       const rest = Math.max(0, max - pizzenHeuteBestellt() - pizzenImWarenkorb());
-      restEl.classList.remove('knapp','leer');
+      restEl.classList.remove('knapp','leer','hidden');
       if(rest === 0){
         restEl.classList.add('leer');
-        restEl.textContent = `🍕 Heute ausverkauft`;
+        restEl.innerHTML = `🍕 Heute ausverkauft – Grazie!`;
       } else {
         if(rest <= Math.max(3, Math.round(max * 0.1))) restEl.classList.add('knapp');
-        restEl.textContent = `🍕 Noch ${rest} von ${max} Pizzen heute`;
+        restEl.innerHTML = `🍕 Noch <span class="zahl">${rest}</span> von ${max} Pizzen heute verfügbar`;
       }
-      restEl.style.display = 'inline-flex';
     } else {
-      restEl.style.display = 'none';
+      restEl.classList.add('hidden');
     }
   }
 
