@@ -272,7 +272,13 @@
   /* ============================================
      KUNDEN-BEREICH
      ============================================ */
-  .kunde-wrap{max-width:900px;margin:0 auto;padding:20px;padding-bottom:120px}
+  .kunde-wrap{
+    max-width:900px;margin:0 auto;padding:20px;
+    /* Platz für die feste Warenkorb-Leiste + iOS Home-Indicator */
+    padding-bottom:calc(120px + env(safe-area-inset-bottom));
+    padding-left:max(20px, env(safe-area-inset-left));
+    padding-right:max(20px, env(safe-area-inset-right));
+  }
   .hero{
     position:relative;
     background:#3a2418 url('roman-team.jpg') center 32%/cover no-repeat;
@@ -513,7 +519,10 @@
     position:fixed;bottom:0;left:0;right:0;
     background:var(--weiss);
     border-top:1px solid var(--grau-linie);
-    padding:14px 20px;
+    /* Safe-Area unten (iOS Home-Indicator) */
+    padding:14px max(20px, env(safe-area-inset-right))
+            max(14px, calc(env(safe-area-inset-bottom) + 8px))
+            max(20px, env(safe-area-inset-left));
     display:flex;align-items:center;justify-content:space-between;
     box-shadow:0 -4px 20px rgba(0,0,0,0.08);
     z-index:50;
@@ -688,8 +697,22 @@
 
   /* Bestellungen */
   .best-filter{
-    display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;
+    display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;
   }
+  .best-sort{
+    margin-left:auto;display:flex;align-items:center;gap:6px;
+    font-size:11px;color:var(--grau-leise);
+    font-family:'Unbounded', sans-serif;letter-spacing:1.5px;
+    text-transform:uppercase;font-weight:600;
+  }
+  .best-sort select{
+    padding:8px 10px;border-radius:10px;
+    border:1.5px solid var(--grau-linie);
+    background:var(--weiss);
+    font-family:inherit;font-size:12px;font-weight:600;
+    color:var(--grau-text);letter-spacing:.5px;
+  }
+  .best-sort select:focus{border-color:var(--gold);outline:none}
   .filter-btn{
     padding:9px 16px;font-size:11px;font-weight:600;
     background:var(--weiss);border-radius:20px;
@@ -950,8 +973,10 @@
 
   /* Toast */
   .toast{
-    position:fixed;bottom:20px;left:50%;
-    transform:translateX(-50%) translateY(100px);
+    position:fixed;
+    bottom:max(20px, calc(env(safe-area-inset-bottom) + 16px));
+    left:50%;
+    transform:translateX(-50%) translateY(140px);
     background:var(--grau-text);color:var(--weiss);
     padding:12px 20px;border-radius:10px;
     box-shadow:var(--schatten-stark);
@@ -1243,6 +1268,15 @@
         <button class="filter-btn aktiv" data-filter="offen" onclick="setzeFilter('offen')">Offen</button>
         <button class="filter-btn" data-filter="erledigt" onclick="setzeFilter('erledigt')">Erledigt</button>
         <button class="filter-btn" data-filter="alle" onclick="setzeFilter('alle')">Alle</button>
+        <label class="best-sort">
+          <span>Sortierung</span>
+          <select id="best-sort" onchange="setzeSortierung(this.value)">
+            <option value="abhol-asc">Abholzeit ↑ (früh → spät)</option>
+            <option value="abhol-desc">Abholzeit ↓ (spät → früh)</option>
+            <option value="eingang-desc">Bestelleingang (neueste zuerst)</option>
+            <option value="eingang-asc">Bestelleingang (älteste zuerst)</option>
+          </select>
+        </label>
       </div>
       <div class="best-liste" id="best-liste"></div>
     </div>
@@ -1532,6 +1566,7 @@ let menu = [];
 let einstellungen = {};
 let bestellungen = [];
 let bestFilter = 'offen';
+let bestSort = 'abhol-asc';
 
 /* ============================================================
    LOGIN
@@ -2263,6 +2298,11 @@ function setzeFilter(f){
   zeigeBestellungen();
 }
 
+function setzeSortierung(s){
+  bestSort = s;
+  zeigeBestellungen();
+}
+
 /* Aktuell gewähltes Datum (Format YYYY-MM-DD) — default: heute */
 function heutigesDatumISO(){
   const d = new Date();
@@ -2320,12 +2360,17 @@ function zeigeBestellungen(){
   if(bestFilter === 'erledigt') liste = liste.filter(b => b.status === 'erledigt');
   // bei 'alle' keine Filterung
 
-  // Sortierung: erledigte neueste zuerst, offene nach Abholzeit aufsteigend
+  // Sortierung gemäß Dropdown
+  const sortSel = document.getElementById('best-sort');
+  if(sortSel && sortSel.value !== bestSort) sortSel.value = bestSort;
   liste = [...liste].sort((a,b) => {
-    if(bestFilter === 'erledigt'){
-      return new Date(b.pickup_time) - new Date(a.pickup_time);
+    switch(bestSort){
+      case 'abhol-desc':   return new Date(b.pickup_time) - new Date(a.pickup_time);
+      case 'eingang-desc': return new Date(b.created_at)  - new Date(a.created_at);
+      case 'eingang-asc':  return new Date(a.created_at)  - new Date(b.created_at);
+      case 'abhol-asc':
+      default:             return new Date(a.pickup_time) - new Date(b.pickup_time);
     }
-    return new Date(a.pickup_time) - new Date(b.pickup_time);
   });
 
   const c = document.getElementById('best-liste');
