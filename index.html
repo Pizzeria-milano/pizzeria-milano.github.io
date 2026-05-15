@@ -2,11 +2,16 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pizzeria Milano – Online Bestellung</title>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#b51a2b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Milano">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=Unbounded:wght@500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -44,6 +49,15 @@
     color:var(--grau-text);
     line-height:1.5;
     -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+    -webkit-touch-callout:none;
+    overscroll-behavior-y:none;
+    text-rendering:optimizeLegibility;
+  }
+  /* UI-Chrome (Header, Tabs, Buttons) nicht selektierbar – wirkt im PWA-Modus aufgeräumter */
+  .header, .tabs, .tab-btn, .btn-klein, .push-banner-btn,
+  .filter-btn, .stat-label, .admin-header-text, .demo-banner{
+    -webkit-user-select:none; user-select:none;
   }
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
   input,select,textarea{font-family:inherit;font-size:16px}
@@ -193,6 +207,10 @@
     background:var(--weiss);
     border-bottom:1px solid var(--grau-linie);
     padding:4px 20px;
+    /* Safe-Area: im PWA-Modus (iOS standalone) Header unter Notch/Statusbar schieben */
+    padding-top:max(4px, env(safe-area-inset-top));
+    padding-left:max(20px, env(safe-area-inset-left));
+    padding-right:max(20px, env(safe-area-inset-right));
     display:flex;align-items:center;justify-content:space-between;
     position:sticky;top:0;z-index:100;
   }
@@ -608,7 +626,13 @@
   /* ============================================
      ADMIN-BEREICH
      ============================================ */
-  .admin-wrap{max-width:1200px;margin:0 auto;padding:20px}
+  .admin-wrap{
+    max-width:1200px;margin:0 auto;padding:20px;
+    /* Safe-Area unten (Home-Indicator iOS) und seitlich (Landscape Notch) */
+    padding-bottom:max(20px, calc(env(safe-area-inset-bottom) + 20px));
+    padding-left:max(20px, env(safe-area-inset-left));
+    padding-right:max(20px, env(safe-area-inset-right));
+  }
   .tabs{
     display:flex;gap:4px;margin-bottom:20px;
     background:var(--weiss);padding:4px;
@@ -872,6 +896,30 @@
   }
   .btn-reset:hover{background:var(--rot-dunkel)}
 
+  /* Push-Benachrichtigungs-Banner (Admin) */
+  .push-banner{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    background:var(--cream);border-radius:10px;
+    border-left:4px solid var(--gold);
+    padding:12px 14px;
+    font-size:14px;
+  }
+  .push-banner.aktiv{border-left-color:var(--gruen);background:#f4fbf6}
+  .push-banner.warnung{border-left-color:#b35b00;background:#fffaf0}
+  .push-banner.fehler{border-left-color:var(--rot);background:#fff5f5}
+  .push-banner-icon{font-size:20px;line-height:1}
+  .push-banner-text{flex:1;min-width:200px;line-height:1.35}
+  .push-banner-text strong{display:block;color:var(--grau-text);margin-bottom:2px}
+  .push-banner-text span{color:var(--grau-leise);font-size:13px}
+  .push-banner-btn{
+    padding:9px 16px;background:var(--burgunder);color:var(--cream);
+    border-radius:8px;font-weight:600;font-size:13px;
+    transition:background .15s;
+  }
+  .push-banner-btn:hover{background:var(--rot)}
+  .push-banner-btn.sekundaer{background:var(--sand);color:var(--burgunder)}
+  .push-banner-btn.sekundaer:hover{background:var(--sand-dunkel)}
+
   /* Toast */
   .toast{
     position:fixed;bottom:20px;left:50%;
@@ -891,7 +939,12 @@
 
   /* Kleine Bildschirme */
   @media (max-width:600px){
-    .admin-wrap{padding:12px}
+    .admin-wrap{
+      padding:12px;
+      padding-bottom:max(12px, calc(env(safe-area-inset-bottom) + 12px));
+      padding-left:max(12px, env(safe-area-inset-left));
+      padding-right:max(12px, env(safe-area-inset-right));
+    }
 
     /* Hero auf Mobile: kompakter + Bild weiter nach oben, damit Gesichter frei */
     .hero{
@@ -1186,6 +1239,32 @@
 
     <!-- Einstellungen -->
     <div id="tab-einstellungen" class="tab-inhalt">
+      <div class="setting-karte" id="push-setting">
+        <h3>🔔 Push-Benachrichtigungen</h3>
+        <p style="font-size:13px;color:var(--grau-leise);margin-bottom:14px">
+          Damit du neue Bestellungen auch dann hörst und siehst, wenn der Browser
+          geschlossen oder das Display gesperrt ist – sehr wichtig für den
+          Verwaltungs‑Betrieb. Bitte auf jedem Gerät einmal aktivieren, von dem
+          aus du die Pizzeria verwalten möchtest.
+        </p>
+        <div id="push-banner" class="push-banner">
+          <div class="push-banner-icon" id="push-banner-icon">🔔</div>
+          <div class="push-banner-text">
+            <strong id="push-banner-titel">Push-Benachrichtigungen</strong>
+            <span id="push-banner-info"></span>
+          </div>
+          <button id="push-banner-aktion" class="push-banner-btn hidden" onclick="aktiviereAdminPush()">Aktivieren</button>
+        </div>
+        <div id="install-hinweis" class="push-banner hidden" style="margin-top:10px">
+          <div class="push-banner-icon">📲</div>
+          <div class="push-banner-text">
+            <strong>App installieren</strong>
+            <span id="install-hinweis-text">Installiere die Pizzeria-App auf dem Startbildschirm – dann starten Push-Benachrichtigungen verlässlich, auch ohne offenen Browser.</span>
+          </div>
+          <button id="install-btn" class="push-banner-btn hidden" onclick="installPwa()">Installieren</button>
+        </div>
+      </div>
+
       <div class="setting-karte">
         <h3>Pizzeria geöffnet</h3>
         <div class="toggle-wrap">
@@ -1331,6 +1410,12 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const T_SETTINGS = 'pizzeria_settings';
 const T_MENU     = 'pizzeria_menu';
 const T_ORDERS   = 'pizzeria_orders';
+const T_PUSH     = 'pizzeria_push_subscriptions';
+
+/* VAPID Public Key für Web Push (gehört zur Edge Function notify-admin).
+   Public Key ist absichtlich öffentlich – die Authentizität wird über den
+   privaten Schlüssel auf Server-Seite garantiert. */
+const VAPID_PUBLIC_KEY = 'BCDozyGTsWs7qfZZ3BLWMy02WJ4OzpJ9l_yAcWTh67HyLKQmNAMX0rf2KUT4Myj95m4uGV-7b-qtJPDhKw7-8bw';
 
 function uuid(){
   if(crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -1865,6 +1950,19 @@ async function starteAdmin(){
   zeigeBestellungen();
   zeigeBuchhaltung();
   starteRealtime('admin');
+  aktualisierePushStatus().then(zeigePushHinweisFallsNoetig);
+}
+
+async function zeigePushHinweisFallsNoetig(){
+  if(!pushUnterstuetzt()) return;
+  if(Notification.permission === 'granted'){
+    if(!swRegistration) swRegistration = await navigator.serviceWorker.getRegistration();
+    if(swRegistration && await swRegistration.pushManager.getSubscription()) return;
+  }
+  // Kein aktives Push -> dezenter Hinweis
+  setTimeout(() => {
+    toast('Push-Benachrichtigungen sind nicht aktiv – bitte unter Einstellungen aktivieren', 'fehler');
+  }, 600);
 }
 
 function zeigeTab(ev, name){
@@ -2457,6 +2555,267 @@ function tonPling(){
   } catch(e){}
 }
 
+/* ============================================================
+   WEB PUSH – Benachrichtigungen für Admin auch bei
+   geschlossenem Tab / gesperrtem Display
+   ============================================================ */
+let swRegistration = null;
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for(let i=0; i<raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+function pushUnterstuetzt(){
+  return 'serviceWorker' in navigator
+      && 'PushManager' in window
+      && 'Notification' in window;
+}
+
+function istIOS(){
+  return /iP(hone|od|ad)/.test(navigator.userAgent || '');
+}
+function istStandalone(){
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || window.navigator.standalone === true;
+}
+
+async function registriereServiceWorker(){
+  if(!('serviceWorker' in navigator)) return null;
+  try{
+    swRegistration = await navigator.serviceWorker.register('sw.js', { scope: './' });
+    return swRegistration;
+  } catch(e){
+    console.warn('SW-Registrierung fehlgeschlagen', e);
+    return null;
+  }
+}
+
+function setzePushBanner(zustand, titel, info, btnLabel, btnAktion){
+  const wrap   = document.getElementById('push-banner');
+  const icon   = document.getElementById('push-banner-icon');
+  const tEl    = document.getElementById('push-banner-titel');
+  const iEl    = document.getElementById('push-banner-info');
+  const btn    = document.getElementById('push-banner-aktion');
+  if(!wrap) return;
+  wrap.classList.remove('hidden','aktiv','warnung','fehler');
+  if(zustand) wrap.classList.add(zustand);
+  icon.textContent = zustand === 'aktiv' ? '✓'
+                   : zustand === 'fehler' ? '⚠️'
+                   : zustand === 'warnung' ? '⚠️' : '🔔';
+  tEl.textContent = titel;
+  iEl.textContent = info || '';
+  if(btnLabel){
+    btn.textContent = btnLabel;
+    btn.classList.remove('hidden');
+    btn.onclick = btnAktion || aktiviereAdminPush;
+  } else {
+    btn.classList.add('hidden');
+    btn.onclick = null;
+  }
+}
+
+async function aktualisierePushStatus(){
+  aktualisiereInstallHinweis();
+  if(!pushUnterstuetzt()){
+    if(istIOS() && !istStandalone()){
+      setzePushBanner('warnung',
+        'Push nur als installierte App möglich',
+        'Auf dem iPhone bitte über Safari Teilen → „Zum Home-Bildschirm" – dann diese App vom Home-Bildschirm öffnen, um Push-Benachrichtigungen zu erhalten.',
+        null, null);
+    } else {
+      setzePushBanner('fehler',
+        'Push-Benachrichtigungen nicht unterstützt',
+        'Dieser Browser kann keine Push-Nachrichten empfangen. Bitte einen aktuellen Chrome, Edge, Firefox oder Safari verwenden.',
+        null, null);
+    }
+    return;
+  }
+  if(!swRegistration){
+    swRegistration = await navigator.serviceWorker.getRegistration();
+    if(!swRegistration) swRegistration = await registriereServiceWorker();
+  }
+  if(!swRegistration){
+    setzePushBanner('fehler', 'Service Worker konnte nicht geladen werden',
+      'Bitte Seite neu laden.', null, null);
+    return;
+  }
+
+  const perm = Notification.permission;
+  if(perm === 'denied'){
+    setzePushBanner('fehler',
+      'Push-Benachrichtigungen blockiert',
+      'In den Browser-Einstellungen für diese Seite bitte „Benachrichtigungen" auf „Zulassen" stellen, sonst werden neue Bestellungen nicht angekündigt, wenn der Tab geschlossen ist.',
+      null, null);
+    return;
+  }
+
+  const sub = await swRegistration.pushManager.getSubscription();
+  if(perm === 'granted' && sub){
+    // Sicherstellen dass die Subscription auch in der DB liegt
+    await speicherePushSub(sub);
+    setzePushBanner('aktiv',
+      'Push-Benachrichtigungen aktiv',
+      'Neue Bestellungen werden auch bei geschlossenem Browser oder gesperrtem Display angezeigt.',
+      'Deaktivieren', deaktiviereAdminPush);
+    return;
+  }
+
+  setzePushBanner(null,
+    'Push-Benachrichtigungen einrichten',
+    'Wichtig für die Verwaltung: aktiviere Push, damit du neue Bestellungen auch hörst und siehst, wenn der Browser nicht offen ist.',
+    'Aktivieren', aktiviereAdminPush);
+}
+
+async function aktiviereAdminPush(){
+  if(!pushUnterstuetzt()){
+    toast('Dieser Browser unterstützt keine Push-Benachrichtigungen', 'fehler');
+    return;
+  }
+  try{
+    if(!swRegistration){
+      swRegistration = await navigator.serviceWorker.getRegistration() || await registriereServiceWorker();
+    }
+    if(!swRegistration){ toast('Service Worker nicht verfügbar', 'fehler'); return; }
+
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){
+      await aktualisierePushStatus();
+      if(perm === 'denied'){
+        toast('Benachrichtigungen wurden blockiert', 'fehler');
+      }
+      return;
+    }
+
+    let sub = await swRegistration.pushManager.getSubscription();
+    if(!sub){
+      sub = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    const ok = await speicherePushSub(sub);
+    if(ok){
+      toast('Push-Benachrichtigungen aktiviert', 'erfolg');
+    }
+    await aktualisierePushStatus();
+  } catch(e){
+    console.error('Push-Aktivierung fehlgeschlagen', e);
+    toast('Push konnte nicht aktiviert werden: ' + (e.message || e), 'fehler');
+  }
+}
+
+async function deaktiviereAdminPush(){
+  try{
+    if(!swRegistration) swRegistration = await navigator.serviceWorker.getRegistration();
+    const sub = swRegistration && await swRegistration.pushManager.getSubscription();
+    if(sub){
+      const endpoint = sub.endpoint;
+      await sub.unsubscribe();
+      await sb.from(T_PUSH).delete().eq('endpoint', endpoint);
+    }
+    toast('Push-Benachrichtigungen deaktiviert');
+    await aktualisierePushStatus();
+  } catch(e){
+    console.error('Push-Deaktivierung fehlgeschlagen', e);
+    toast('Konnte Push nicht deaktivieren', 'fehler');
+  }
+}
+
+/* PWA-Installation: beforeinstallprompt abfangen (Chrome/Edge/Android) */
+let pwaInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  pwaInstallPrompt = e;
+  aktualisiereInstallHinweis();
+});
+window.addEventListener('appinstalled', () => {
+  pwaInstallPrompt = null;
+  document.documentElement.classList.add('pwa-installed');
+  aktualisiereInstallHinweis();
+  aktualisierePushStatus();
+});
+
+async function installPwa(){
+  if(!pwaInstallPrompt){
+    toast('Installation hier nicht möglich – bitte über das Browser-Menü „Zum Startbildschirm hinzufügen"', 'fehler');
+    return;
+  }
+  pwaInstallPrompt.prompt();
+  try{
+    const { outcome } = await pwaInstallPrompt.userChoice;
+    if(outcome === 'accepted'){ toast('App wird installiert…', 'erfolg'); }
+  } catch(_){}
+  pwaInstallPrompt = null;
+  aktualisiereInstallHinweis();
+}
+
+function aktualisiereInstallHinweis(){
+  const wrap = document.getElementById('install-hinweis');
+  const btn  = document.getElementById('install-btn');
+  const text = document.getElementById('install-hinweis-text');
+  if(!wrap) return;
+
+  if(istStandalone()){
+    wrap.classList.add('hidden');
+    return;
+  }
+  // Nicht installiert -> sichtbar
+  wrap.classList.remove('hidden');
+  if(istIOS()){
+    text.textContent = 'iPhone/iPad: in Safari unten auf „Teilen" → „Zum Home-Bildschirm". Erst die so installierte App empfängt Push-Benachrichtigungen zuverlässig.';
+    btn.classList.add('hidden');
+  } else if(pwaInstallPrompt){
+    text.textContent = 'Installiere die Pizzeria-App auf dem Startbildschirm – dann starten Push-Benachrichtigungen verlässlich, auch ohne offenen Browser.';
+    btn.classList.remove('hidden');
+  } else {
+    text.textContent = 'Tipp: Über das Browser-Menü „App installieren" oder „Zum Startbildschirm hinzufügen" wird die Pizzeria zur eigenständigen App – Push funktioniert dann auch bei geschlossenem Browser.';
+    btn.classList.add('hidden');
+  }
+}
+
+async function speicherePushSub(sub){
+  try{
+    const json = sub.toJSON();
+    const row = {
+      endpoint:   json.endpoint,
+      p256dh:     json.keys && json.keys.p256dh,
+      auth:       json.keys && json.keys.auth,
+      user_agent: (navigator.userAgent || '').slice(0, 300)
+    };
+    if(!row.endpoint || !row.p256dh || !row.auth){
+      throw new Error('Subscription ohne Schlüssel');
+    }
+    const { error } = await sb.from(T_PUSH).upsert(row, { onConflict: 'endpoint' });
+    if(error){
+      console.error('Subscription speichern fehlgeschlagen', error);
+      toast('Subscription konnte nicht gespeichert werden: ' + error.message, 'fehler');
+      return false;
+    }
+    return true;
+  } catch(e){
+    console.error(e);
+    toast('Subscription-Fehler: ' + (e.message || e), 'fehler');
+    return false;
+  }
+}
+
+// Klicks auf eine Push-Benachrichtigung sollen den Bestellungen-Tab öffnen
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message', (ev) => {
+    if(ev.data && ev.data.type === 'open-orders'){
+      const tab = document.querySelector('.tab-btn[data-tab="bestellungen"]');
+      if(tab && sessionStorage.getItem('rolle') === 'admin'){
+        tab.click();
+      }
+    }
+  });
+}
+
 const ORIG_TITEL = 'Pizzeria Milano – Online Bestellung';
 let ungeleseneBestellungen = 0;
 function aktualisiereTitel(){
@@ -2472,19 +2831,44 @@ function bestellungenGesehen(){
     aktualisiereTitel();
   }
 }
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible'){
-    const aktiverTab = document.querySelector('.tab-btn.aktiv');
-    if(sessionStorage.getItem('rolle') === 'admin' && aktiverTab && aktiverTab.dataset.tab === 'bestellungen'){
-      bestellungenGesehen();
-    }
+document.addEventListener('visibilitychange', async () => {
+  if(document.visibilityState !== 'visible') return;
+  const rolle = sessionStorage.getItem('rolle');
+  const aktiverTab = document.querySelector('.tab-btn.aktiv');
+  if(rolle === 'admin' && aktiverTab && aktiverTab.dataset.tab === 'bestellungen'){
+    bestellungenGesehen();
+  }
+  // PWA wurde aus dem Hintergrund geweckt -> Daten neu laden, damit
+  // verpasste Realtime-Events (Background-Suspend, Netzabriss) nachgezogen werden.
+  if(rolle === 'admin'){
+    try{
+      await ladeAlles();
+      zeigeBestellungen();
+      zeigeBuchhaltung();
+    } catch(_){}
   }
 });
+
+/* PWA-Installations-Status früh erkennen, damit das CSS Layout korrekt rendern kann */
+function pwaStatusErmitteln(){
+  if(istStandalone()){
+    document.documentElement.classList.add('pwa-installed');
+  } else {
+    document.documentElement.classList.remove('pwa-installed');
+  }
+}
+pwaStatusErmitteln();
+if(window.matchMedia){
+  const mq = window.matchMedia('(display-mode: standalone)');
+  if(mq.addEventListener){ mq.addEventListener('change', pwaStatusErmitteln); }
+  else if(mq.addListener){ mq.addListener(pwaStatusErmitteln); }
+}
 
 /* ============================================================
    START
    ============================================================ */
 window.addEventListener('load', () => {
+  registriereServiceWorker();
   const rolle = sessionStorage.getItem('rolle');
   if(rolle === 'kunde') starteKunde();
   else if(rolle === 'admin') starteAdmin();
