@@ -896,6 +896,34 @@
   }
   .btn-reset:hover{background:var(--rot-dunkel)}
 
+  /* Pull-to-Refresh – Indikator über allen Layern */
+  .ptr-indicator{
+    position:fixed;
+    top:max(8px, env(safe-area-inset-top));
+    left:50%;
+    transform:translate(-50%, -60px);
+    width:44px;height:44px;
+    background:#fff;border-radius:50%;
+    box-shadow:0 6px 18px rgba(0,0,0,0.18);
+    display:flex;align-items:center;justify-content:center;
+    z-index:9999;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s ease;
+    will-change:transform,opacity;
+  }
+  .ptr-indicator.snap{transition:transform .25s ease, opacity .2s ease}
+  .ptr-indicator.aktiv{opacity:1}
+  .ptr-spinner{
+    width:22px;height:22px;
+    border:3px solid #ead9bd;
+    border-top-color:var(--burgunder);
+    border-radius:50%;
+    will-change:transform;
+  }
+  .ptr-indicator.refreshing .ptr-spinner{animation:ptr-spin .85s linear infinite}
+  @keyframes ptr-spin{to{transform:rotate(360deg)}}
+
   /* Push-Benachrichtigungs-Banner (Admin) */
   .push-banner{
     display:flex;align-items:center;gap:12px;flex-wrap:wrap;
@@ -988,6 +1016,11 @@
 </style>
 </head>
 <body>
+
+<!-- Pull-to-Refresh Indikator -->
+<div id="ptr-indicator" class="ptr-indicator" aria-hidden="true">
+  <div class="ptr-spinner" id="ptr-spinner"></div>
+</div>
 
 <!-- ============================================
      LOGIN
@@ -2848,6 +2881,125 @@ document.addEventListener('visibilitychange', async () => {
     } catch(_){}
   }
 });
+
+/* ============================================================
+   PULL-TO-REFRESH – vom Seitenanfang nach unten ziehen lädt neu
+   ============================================================ */
+(function initPullToRefresh(){
+  const SCHWELLE   = 70;   // px ab denen ausgelöst wird
+  const MAX_PULL   = 110;  // px Sichtbarer Maximalwert
+  const indikator  = document.getElementById('ptr-indicator');
+  const spinner    = document.getElementById('ptr-spinner');
+  if(!indikator || !spinner) return;
+
+  let startY = 0;
+  let aktuelleAuslenkung = 0;
+  let traegt = false;        // Geste wird aktiv getrackt
+  let laeuft = false;        // Refresh läuft gerade
+
+  function darfStarten(target){
+    if(laeuft) return false;
+    if(window.scrollY > 0) return false;
+    // Login-Screen nicht refreshen (kein Datenkontext)
+    const rolle = sessionStorage.getItem('rolle');
+    if(rolle !== 'admin' && rolle !== 'kunde') return false;
+    // Nicht starten wenn der Finger in einer scrollbaren Liste/Modal/Input
+    // beginnt – sonst kollidiert die Geste mit normalem Scrollen.
+    if(target && target.closest){
+      if(target.closest('input,textarea,select,[contenteditable]')) return false;
+      // Modale / Dialoge dürfen ihre eigene Geste behalten
+      if(target.closest('.modal,.overlay,[role="dialog"]')) return false;
+    }
+    return true;
+  }
+
+  function setzeIndikator(delta){
+    const sichtbar = Math.min(delta, MAX_PULL);
+    const offsetY  = sichtbar - 60; // ausgangsversteck: -60 px
+    indikator.style.transform = `translate(-50%, ${offsetY}px)`;
+    const winkel = Math.min(360, (delta / SCHWELLE) * 270);
+    spinner.style.transform = `rotate(${winkel}deg)`;
+    indikator.classList.toggle('aktiv', delta > 8);
+  }
+
+  function snapZurueck(){
+    indikator.classList.add('snap');
+    indikator.style.transform = 'translate(-50%, -60px)';
+    indikator.classList.remove('aktiv');
+    spinner.style.transform = '';
+    setTimeout(() => indikator.classList.remove('snap'), 280);
+  }
+
+  async function ausloeseRefresh(){
+    laeuft = true;
+    indikator.classList.add('snap','refreshing','aktiv');
+    indikator.style.transform = 'translate(-50%, 18px)'; // sichtbar fixieren
+    spinner.style.transform = ''; // CSS-Animation übernimmt jetzt
+    try{
+      await ladeAlles();
+      const rolle = sessionStorage.getItem('rolle');
+      if(rolle === 'admin'){
+        zeigeEinstellungen();
+        zeigeMenuAdmin();
+        zeigeBestellungen();
+        zeigeBuchhaltung();
+      } else if(rolle === 'kunde'){
+        zeigeStatusKunde();
+        zeigeMenuKunde();
+        updateWarenkorbAnzeige();
+      }
+    } catch(e){
+      toast('Aktualisieren fehlgeschlagen: ' + (e?.message || e), 'fehler');
+    } finally {
+      // kurzer Moment, damit der Spinner nicht aufblitzt
+      setTimeout(() => {
+        indikator.classList.remove('refreshing');
+        snapZurueck();
+        laeuft = false;
+      }, 350);
+    }
+  }
+
+  document.addEventListener('touchstart', (e) => {
+    if(!darfStarten(e.target)) return;
+    startY = e.touches[0].clientY;
+    aktuelleAuslenkung = 0;
+    traegt = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if(!traegt) return;
+    const delta = e.touches[0].clientY - startY;
+    if(delta <= 0){
+      // hochgewischt -> nichts tun, Geste verwerfen
+      traegt = false;
+      snapZurueck();
+      return;
+    }
+    // Bei Scroll mittendrin (Browser-Scroll setzte ein) abbrechen
+    if(window.scrollY > 0){
+      traegt = false;
+      snapZurueck();
+      return;
+    }
+    // Sanfte Dämpfung beim Überziehen
+    const gedaempft = delta < MAX_PULL ? delta : MAX_PULL + (delta - MAX_PULL) * 0.25;
+    aktuelleAuslenkung = gedaempft;
+    setzeIndikator(gedaempft);
+  }, { passive: true });
+
+  function beendeGeste(){
+    if(!traegt) return;
+    traegt = false;
+    if(aktuelleAuslenkung >= SCHWELLE){
+      ausloeseRefresh();
+    } else {
+      snapZurueck();
+    }
+  }
+  document.addEventListener('touchend',    beendeGeste, { passive: true });
+  document.addEventListener('touchcancel', beendeGeste, { passive: true });
+})();
 
 /* PWA-Installations-Status früh erkennen, damit das CSS Layout korrekt rendern kann */
 function pwaStatusErmitteln(){
