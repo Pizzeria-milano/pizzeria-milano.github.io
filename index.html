@@ -748,6 +748,32 @@
     font-family:'Unbounded', sans-serif;letter-spacing:1.5px;
     text-transform:uppercase;font-weight:600;
   }
+  /* Live-Sync-Anzeige */
+  .sync-indikator{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:11px;color:var(--grau-leise);
+    font-family:'Unbounded', sans-serif;letter-spacing:1px;
+    text-transform:uppercase;font-weight:600;
+    padding:6px 10px;border-radius:14px;
+    background:var(--cream);border:1px solid var(--grau-linie);
+  }
+  .sync-indikator.frisch{color:var(--gruen);border-color:#cfe8d7}
+  .sync-indikator.alt{color:#b35b00;border-color:#f5d8a8}
+  .sync-indikator.tot{color:var(--rot);border-color:#f5c0c0}
+  .sync-dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--grau-linie);flex-shrink:0;
+  }
+  .sync-indikator.frisch .sync-dot{
+    background:var(--gruen);
+    animation:sync-pulse 2s ease-in-out infinite;
+  }
+  .sync-indikator.alt .sync-dot{background:#b35b00}
+  .sync-indikator.tot .sync-dot{background:var(--rot)}
+  @keyframes sync-pulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(45,106,79,.55)}
+    50%{box-shadow:0 0 0 6px rgba(45,106,79,0)}
+  }
   .best-sort select{
     padding:8px 10px;border-radius:10px;
     border:1.5px solid var(--grau-linie);
@@ -1318,6 +1344,10 @@
         <button class="filter-btn aktiv" data-filter="offen" onclick="setzeFilter('offen')">Offen</button>
         <button class="filter-btn" data-filter="erledigt" onclick="setzeFilter('erledigt')">Erledigt</button>
         <button class="filter-btn" data-filter="alle" onclick="setzeFilter('alle')">Alle</button>
+        <span id="sync-indikator" class="sync-indikator" title="Daten werden alle 5 s aktualisiert">
+          <span class="sync-dot"></span>
+          <span id="sync-label">–</span>
+        </span>
         <label class="best-sort">
           <span>Sortierung</span>
           <select id="best-sort" onchange="setzeSortierung(this.value)">
@@ -1649,6 +1679,7 @@ function ausloggen(){
   if(realtimeReconnectTimer){ clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
   aktiveRolle = null;
   stoppePolling();
+  stoppeSyncTick();
   sessionStorage.removeItem('rolle');
   document.getElementById('login').classList.remove('hidden');
   document.getElementById('kunde').classList.add('hidden');
@@ -2073,6 +2104,7 @@ async function starteAdmin(){
   zeigeBuchhaltung();
   starteRealtime('admin');
   startePolling();
+  starteSyncTick();
   aktualisierePushStatus().then(zeigePushHinweisFallsNoetig);
 }
 
@@ -2590,15 +2622,26 @@ async function demoReset(){
 /* ============================================================
    LADE-FUNKTION (async, lädt aus Supabase)
    ============================================================ */
+let letzterSyncMs = 0;
+let letzterSyncOK = true;
 async function ladeAlles(){
-  const [sR, mR, bR] = await Promise.all([
-    sb.from(T_SETTINGS).select('*').eq('id', 1).single(),
-    sb.from(T_MENU).select('*').order('sort_order', { ascending: true }),
-    sb.from(T_ORDERS).select('*').order('created_at', { ascending: false })
-  ]);
-  if(sR.data) einstellungen = sR.data;
-  if(mR.data) menu = mR.data;
-  if(bR.data) bestellungen = bR.data;
+  try{
+    const [sR, mR, bR] = await Promise.all([
+      sb.from(T_SETTINGS).select('*').eq('id', 1).single(),
+      sb.from(T_MENU).select('*').order('sort_order', { ascending: true }),
+      sb.from(T_ORDERS).select('*').order('created_at', { ascending: false })
+    ]);
+    if(sR.data) einstellungen = sR.data;
+    if(mR.data) menu = mR.data;
+    if(bR.data) bestellungen = bR.data;
+    letzterSyncMs = Date.now();
+    letzterSyncOK = !(sR.error || mR.error || bR.error);
+    aktualisiereSyncIndikator();
+  } catch(e){
+    letzterSyncOK = false;
+    aktualisiereSyncIndikator();
+    throw e;
+  }
 }
 
 /* ============================================================
@@ -2682,6 +2725,37 @@ function startePolling(){
 }
 function stoppePolling(){
   if(pollingTimer){ clearInterval(pollingTimer); pollingTimer = null; }
+}
+
+/* Anzeige „Letzter Sync vor X s" — aktualisiert sich sekündlich */
+let syncTickTimer = null;
+function aktualisiereSyncIndikator(){
+  const el  = document.getElementById('sync-indikator');
+  const lbl = document.getElementById('sync-label');
+  if(!el || !lbl) return;
+  if(!letzterSyncMs){
+    lbl.textContent = '–';
+    el.classList.remove('frisch','alt','tot');
+    return;
+  }
+  const sek = Math.max(0, Math.round((Date.now() - letzterSyncMs) / 1000));
+  let text;
+  if(sek < 5)        text = `Live · vor ${sek}s`;
+  else if(sek < 60)  text = `Sync vor ${sek}s`;
+  else if(sek < 3600) text = `Sync vor ${Math.round(sek/60)} min`;
+  else               text = `Sync vor >1 h`;
+  if(!letzterSyncOK) text = 'Verbindung gestört';
+  lbl.textContent = text;
+  el.classList.toggle('frisch', letzterSyncOK && sek < 15);
+  el.classList.toggle('alt',    letzterSyncOK && sek >= 15 && sek < 60);
+  el.classList.toggle('tot',    !letzterSyncOK || sek >= 60);
+}
+function starteSyncTick(){
+  if(syncTickTimer) clearInterval(syncTickTimer);
+  syncTickTimer = setInterval(aktualisiereSyncIndikator, 1000);
+}
+function stoppeSyncTick(){
+  if(syncTickTimer){ clearInterval(syncTickTimer); syncTickTimer = null; }
 }
 
 /* ============================================================
