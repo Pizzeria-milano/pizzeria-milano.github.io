@@ -469,10 +469,53 @@
   .pizza-bild{
     width:90px;height:90px;border-radius:10px;
     object-fit:cover;flex-shrink:0;background:var(--sand);
+    cursor:zoom-in;transition:transform .15s ease;
   }
+  .pizza-bild:active{transform:scale(.96)}
   @media (max-width:480px){
     .pizza-bild{width:70px;height:70px}
   }
+
+  /* Lightbox für vergrößerte Speisen-Bilder */
+  .bild-modal{
+    position:fixed;inset:0;z-index:400;
+    background:rgba(0,0,0,0.9);
+    display:none;align-items:center;justify-content:center;
+    padding:max(56px, calc(env(safe-area-inset-top) + 56px))
+            16px
+            max(56px, calc(env(safe-area-inset-bottom) + 56px));
+    animation:bm-fade .18s ease both;
+  }
+  .bild-modal.aktiv{display:flex}
+  @keyframes bm-fade{from{opacity:0}to{opacity:1}}
+  .bild-modal img{
+    max-width:100%;max-height:100%;
+    border-radius:14px;object-fit:contain;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    animation:bm-zoom .22s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes bm-zoom{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+  .bild-modal-name{
+    position:absolute;left:0;right:0;
+    bottom:max(20px, calc(env(safe-area-inset-bottom) + 14px));
+    text-align:center;color:#fff;
+    font-family:'Fraunces',serif;font-weight:800;font-size:22px;
+    text-shadow:0 2px 12px rgba(0,0,0,.7);
+    padding:0 20px;pointer-events:none;letter-spacing:-.3px;
+  }
+  .bild-modal-close{
+    position:absolute;
+    top:max(14px, calc(env(safe-area-inset-top) + 8px));
+    right:max(14px, env(safe-area-inset-right));
+    width:42px;height:42px;border-radius:50%;
+    background:rgba(255,255,255,.18);color:#fff;
+    font-size:26px;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(255,255,255,.28);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    cursor:pointer;
+  }
+  .bild-modal-close:hover{background:rgba(255,255,255,.3)}
 
   /* Bild-Upload im Admin */
   .admin-bild-wrap{
@@ -1207,6 +1250,13 @@
   </div>
 </div>
 
+<!-- Lightbox für vergrößerte Speisen-Bilder -->
+<div class="bild-modal" id="bild-modal" onclick="schliesseBild(event)" role="dialog" aria-modal="true" aria-label="Bild vergrößert">
+  <button class="bild-modal-close" type="button" aria-label="Schließen" onclick="schliesseBild()">×</button>
+  <img id="bild-modal-img" alt="">
+  <div class="bild-modal-name" id="bild-modal-name"></div>
+</div>
+
 <!-- ============================================
      ADMIN-BEREICH
      ============================================ -->
@@ -1734,7 +1784,7 @@ function zeigeMenuKunde(){
     <div class="pizza-liste">
       ${gruppen[kat].map(p => `
         <div class="pizza-karte">
-          ${p.image ? `<img class="pizza-bild" src="${p.image}" alt="${escape(p.name)}">` : ''}
+          ${p.image ? `<img class="pizza-bild" src="${p.image}" alt="${escape(p.name)}" onclick="oeffneBild('${escape(p.image)}','${escape(p.name)}')">` : ''}
           <div class="pizza-info">
             <div class="pizza-name">${escape(p.name)}</div>
             ${p.description ? `<div class="pizza-beschr">${escape(p.description)}</div>` : ''}
@@ -2661,6 +2711,33 @@ function istStandalone(){
   return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
       || window.navigator.standalone === true;
 }
+
+/* ============================================================
+   BILD-LIGHTBOX – Tap auf ein Speisen-Bild zeigt es vergrößert
+   ============================================================ */
+function oeffneBild(url, name){
+  const m = document.getElementById('bild-modal');
+  if(!m || !url) return;
+  document.getElementById('bild-modal-img').src = url;
+  document.getElementById('bild-modal-img').alt = name || '';
+  document.getElementById('bild-modal-name').textContent = name || '';
+  m.classList.add('aktiv');
+  document.body.style.overflow = 'hidden';
+}
+function schliesseBild(ev){
+  // Klick aufs Bild selbst soll NICHT schließen, nur Backdrop oder X-Button
+  if(ev && ev.target && ev.target.tagName === 'IMG') return;
+  const m = document.getElementById('bild-modal');
+  if(!m) return;
+  m.classList.remove('aktiv');
+  document.body.style.overflow = '';
+  document.getElementById('bild-modal-img').src = '';
+}
+document.addEventListener('keydown', (e) => {
+  if(e.key !== 'Escape') return;
+  const m = document.getElementById('bild-modal');
+  if(m && m.classList.contains('aktiv')) schliesseBild();
+});
 
 async function registriereServiceWorker(){
   if(!('serviceWorker' in navigator)) return null;
