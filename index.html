@@ -1646,6 +1646,9 @@ function ausloggen(){
   stoppeMusik();
   bestellungenGesehen();
   if(realtimeKanal){ sb.removeChannel(realtimeKanal); realtimeKanal = null; }
+  if(realtimeReconnectTimer){ clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
+  aktiveRolle = null;
+  stoppePolling();
   sessionStorage.removeItem('rolle');
   document.getElementById('login').classList.remove('hidden');
   document.getElementById('kunde').classList.add('hidden');
@@ -1668,6 +1671,7 @@ async function starteKunde(){
   updateWarenkorbAnzeige();
   starteMusik();
   starteRealtime('kunde');
+  startePolling();
 }
 
 /* ============================================================
@@ -2068,6 +2072,7 @@ async function starteAdmin(){
   zeigeBestellungen();
   zeigeBuchhaltung();
   starteRealtime('admin');
+  startePolling();
   aktualisierePushStatus().then(zeigePushHinweisFallsNoetig);
 }
 
@@ -2600,8 +2605,13 @@ async function ladeAlles(){
    REALTIME – Supabase-Subscription für geräteübergreifende Sync
    ============================================================ */
 let realtimeKanal = null;
+let realtimeReconnectTimer = null;
+let aktiveRolle = null;
+
 function starteRealtime(rolle){
+  aktiveRolle = rolle;
   if(realtimeKanal){ sb.removeChannel(realtimeKanal); realtimeKanal = null; }
+  if(realtimeReconnectTimer){ clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
   realtimeKanal = sb.channel('pizzeria-' + rolle)
     .on('postgres_changes', { event: '*', schema: 'public', table: T_SETTINGS }, async () => {
       await ladeAlles();
@@ -2626,7 +2636,52 @@ function starteRealtime(rolle){
         zeigeBuchhaltung();
       }
     })
-    .subscribe();
+    .subscribe((status) => {
+      // bei Verbindungsabriss neu verbinden + Daten nachholen
+      if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+        if(realtimeReconnectTimer) return;
+        realtimeReconnectTimer = setTimeout(() => {
+          realtimeReconnectTimer = null;
+          const r = sessionStorage.getItem('rolle');
+          if(r === aktiveRolle) starteRealtime(aktiveRolle);
+        }, 3000);
+      } else if(status === 'SUBSCRIBED'){
+        // Nach erfolgreichem (Re-)Connect Daten frisch ziehen, damit
+        // verpasste Events während des Ausfalls nachgeladen werden.
+        refreshFuerRolle().catch(() => {});
+      }
+    });
+}
+
+async function refreshFuerRolle(){
+  const rolle = sessionStorage.getItem('rolle');
+  if(!rolle) return;
+  await ladeAlles();
+  if(rolle === 'admin'){
+    zeigeBestellungen();
+    zeigeBuchhaltung();
+    zeigeMenuAdmin();
+    zeigeEinstellungen();
+  } else if(rolle === 'kunde'){
+    zeigeStatusKunde();
+    zeigeMenuKunde();
+    updateWarenkorbAnzeige();
+  }
+}
+
+/* Polling-Fallback: lädt alle 30 s neu, falls Realtime stumm aussetzt.
+   Greift nur wenn der Tab/das Fenster sichtbar ist. */
+let pollingTimer = null;
+function startePolling(){
+  if(pollingTimer) clearInterval(pollingTimer);
+  pollingTimer = setInterval(() => {
+    if(document.visibilityState !== 'visible') return;
+    if(!sessionStorage.getItem('rolle')) return;
+    refreshFuerRolle().catch(() => {});
+  }, 30000);
+}
+function stoppePolling(){
+  if(pollingTimer){ clearInterval(pollingTimer); pollingTimer = null; }
 }
 
 /* ============================================================
@@ -2986,23 +3041,28 @@ function bestellungenGesehen(){
     aktualisiereTitel();
   }
 }
-document.addEventListener('visibilitychange', async () => {
-  if(document.visibilityState !== 'visible') return;
+async function aufWachen(){
   const rolle = sessionStorage.getItem('rolle');
+  if(!rolle) return;
   const aktiverTab = document.querySelector('.tab-btn.aktiv');
   if(rolle === 'admin' && aktiverTab && aktiverTab.dataset.tab === 'bestellungen'){
     bestellungenGesehen();
   }
-  // PWA wurde aus dem Hintergrund geweckt -> Daten neu laden, damit
-  // verpasste Realtime-Events (Background-Suspend, Netzabriss) nachgezogen werden.
-  if(rolle === 'admin'){
-    try{
-      await ladeAlles();
-      zeigeBestellungen();
-      zeigeBuchhaltung();
-    } catch(_){}
-  }
+  // Aus dem Hintergrund geweckt -> Daten neu laden + Realtime sicher reaktivieren,
+  // damit verpasste Events (Background-Suspend, WS-Idle-Drop) nachgezogen werden.
+  try{ await refreshFuerRolle(); } catch(_){}
+  // Falls Realtime stumm aussetzte, neu aufsetzen
+  if(!realtimeKanal && rolle){ starteRealtime(rolle); }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') aufWachen();
 });
+// Desktop-PWA-Fenster löst visibilitychange im Vordergrund kaum aus –
+// auf focus reagieren wir zusätzlich, damit nach App-Wechsel frisch geladen wird.
+window.addEventListener('focus', aufWachen);
+// Wenn das Netz zurückkommt, ebenfalls neu laden
+window.addEventListener('online', aufWachen);
 
 /* ============================================================
    PULL-TO-REFRESH – vom Seitenanfang nach unten ziehen lädt neu
