@@ -860,6 +860,11 @@
   .aktion-btn.primary:hover{background:var(--rot)}
   .aktion-btn.gruen{background:var(--gruen);color:var(--cream)}
   .aktion-btn.gruen:hover{background:#1f4d38}
+  .aktion-btn.gefahr{
+    background:transparent;color:var(--rot);
+    border:1px solid var(--rot);
+  }
+  .aktion-btn.gefahr:hover{background:var(--rot);color:#fff}
 
   .best-empty{
     text-align:center;padding:40px;color:var(--grau-leise);
@@ -2525,6 +2530,8 @@ function zeigeBestellungen(){
       ? `<button class="aktion-btn gruen" onclick="updateStatus('${b.id}','erledigt')">✓ Als erledigt markieren</button>`
       : `<button class="aktion-btn" onclick="updateStatus('${b.id}','offen')">↩ Zurück zu offen</button>`;
 
+    const loeschen = `<button class="aktion-btn gefahr" onclick="loescheBestellung('${b.id}')" title="Bestellung löschen (Kontingent wird wieder freigegeben)">🗑 Löschen</button>`;
+
     return `
       <div class="best-karte ${b.status}">
         <div class="best-kopf">
@@ -2542,6 +2549,7 @@ function zeigeBestellungen(){
         <div class="best-summe">${formatPreis(b.total)}</div>
         <div class="best-aktionen">
           ${statusAktionen}
+          ${loeschen}
         </div>
       </div>
     `;
@@ -2647,6 +2655,29 @@ async function updateStatus(id, neuerStatus){
   zeigeBestellungen();
 }
 
+async function loescheBestellung(id){
+  const b = bestellungen.find(x => x.id === id);
+  if(!b) return;
+  const nr = b.id.substring(0,8).toUpperCase();
+  const items = (Array.isArray(b.items) ? b.items : [])
+    .map(i => `${i.anzahl}× ${i.name}`).join(', ');
+  const msg = `Bestellung #${nr} von ${b.customer_name} wirklich löschen?\n\n${items}\n\nDie enthaltenen Artikel werden im Tageskontingent wieder freigegeben.`;
+  if(!confirm(msg)) return;
+
+  const { error } = await sb.from(T_ORDERS).delete().eq('id', id);
+  if(error){
+    toast('Löschen fehlgeschlagen: ' + error.message, 'fehler');
+    return;
+  }
+  // Lokal aus der Liste nehmen, damit die UI nicht auf den Realtime-/Polling-
+  // Roundtrip warten muss; ladeAlles würde dasselbe Ergebnis liefern.
+  const idx = bestellungen.findIndex(x => x.id === id);
+  if(idx !== -1) bestellungen.splice(idx, 1);
+  zeigeBestellungen();
+  zeigeBuchhaltung();
+  toast(`Bestellung #${nr} gelöscht – Kontingent freigegeben`, 'erfolg');
+}
+
 async function togglePaid(id){
   const b = bestellungen.find(x => x.id === id);
   if(!b) return;
@@ -2724,6 +2755,9 @@ function starteRealtime(rolle){
         }
         zeigeBestellungen();
         zeigeBuchhaltung();
+      } else if(rolle === 'kunde'){
+        // Tageskontingent (Pizza/Salate) live aktualisieren
+        zeigeStatusKunde();
       }
     })
     .subscribe((status) => {
