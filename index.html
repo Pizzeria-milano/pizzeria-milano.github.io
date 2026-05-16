@@ -2669,8 +2669,8 @@ async function refreshFuerRolle(){
   }
 }
 
-/* Polling-Fallback: lädt alle 30 s neu, falls Realtime stumm aussetzt.
-   Greift nur wenn der Tab/das Fenster sichtbar ist. */
+/* Polling: lädt alle 5 s neu. Greift nur wenn das Fenster sichtbar ist,
+   damit im Hintergrund keine Anfragen mehr rauslaufen. */
 let pollingTimer = null;
 function startePolling(){
   if(pollingTimer) clearInterval(pollingTimer);
@@ -2678,7 +2678,7 @@ function startePolling(){
     if(document.visibilityState !== 'visible') return;
     if(!sessionStorage.getItem('rolle')) return;
     refreshFuerRolle().catch(() => {});
-  }, 30000);
+  }, 5000);
 }
 function stoppePolling(){
   if(pollingTimer){ clearInterval(pollingTimer); pollingTimer = null; }
