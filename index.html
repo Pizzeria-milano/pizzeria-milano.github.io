@@ -1232,8 +1232,8 @@
       </svg>
     </div>
     <div class="header-btns">
-      <button class="btn-klein btn-musik" id="musik-btn" onclick="toggleMusik()" title="Hintergrundmusik an/aus">
-        <span class="musik-note">🎵</span><span id="musik-label">Musik</span>
+      <button class="btn-klein btn-musik pausiert" id="musik-btn" onclick="toggleMusik()" title="Hintergrundmusik an/aus">
+        <span class="musik-note">🎵</span><span id="musik-label">Musik aus</span>
       </button>
       <button class="btn-klein" onclick="ausloggen()">Abmelden</button>
     </div>
@@ -1717,7 +1717,7 @@ async function starteKunde(){
   zeigeStatusKunde();
   zeigeMenuKunde();
   updateWarenkorbAnzeige();
-  starteMusik();
+  setzeMusikButton(true);
   starteRealtime('kunde');
   startePolling();
 }
