@@ -2737,12 +2737,18 @@ function starteRealtime(rolle){
     .on('postgres_changes', { event: '*', schema: 'public', table: T_SETTINGS }, async () => {
       await ladeAlles();
       if(rolle === 'kunde'){ zeigeStatusKunde(); zeigeMenuKunde(); updateWarenkorbAnzeige(); }
-      else { zeigeEinstellungen(); }
+      else {
+        // Re-Render skippen, wenn Admin gerade in einem Einstellungen-Feld tippt
+        if(!nutzerTipptIn('tab-einstellungen')) zeigeEinstellungen();
+      }
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: T_MENU }, async () => {
       await ladeAlles();
       if(rolle === 'kunde'){ zeigeMenuKunde(); }
-      else { zeigeMenuAdmin(); }
+      else {
+        // Re-Render skippen, wenn Admin gerade in einem Menü-Feld tippt
+        if(!nutzerTipptIn('tab-menu')) zeigeMenuAdmin();
+      }
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: T_ORDERS }, async (payload) => {
       await ladeAlles();
@@ -3195,6 +3201,17 @@ function bestellungenGesehen(){
     ungeleseneBestellungen = 0;
     aktualisiereTitel();
   }
+}
+
+/* Prüft, ob der Nutzer gerade in einem Eingabefeld innerhalb eines bestimmten Tabs tippt.
+   Wird vom Realtime-Sync genutzt, um Eingaben nicht durch eigenes Echo zu überschreiben. */
+function nutzerTipptIn(tabId){
+  const af = document.activeElement;
+  if(!af) return false;
+  const tag = af.tagName;
+  if(tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') return false;
+  const tab = document.getElementById(tabId);
+  return !!(tab && tab.contains(af));
 }
 async function aufWachen(){
   const rolle = sessionStorage.getItem('rolle');
