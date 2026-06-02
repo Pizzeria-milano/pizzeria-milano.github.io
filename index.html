@@ -1337,7 +1337,6 @@
       <div class="stat-grid">
         <div class="stat"><div class="stat-label">Offen</div><div class="stat-wert" id="stat-offen">0</div></div>
         <div class="stat"><div class="stat-label">Erledigt</div><div class="stat-wert" id="stat-erledigt">0</div></div>
-        <div class="stat"><div class="stat-label">Umsatz <span id="stat-umsatz-label">heute</span></div><div class="stat-wert" id="stat-umsatz">0,00 €</div></div>
       </div>
 
       <div class="best-datum-wrap">
@@ -2483,14 +2482,12 @@ function zeigeBestellungen(){
   // Statistiken
   const offen    = tages.filter(b => b.status === 'offen').length;
   const erledigt = tages.filter(b => b.status === 'erledigt').length;
-  const umsatz   = tages.reduce((s,b) => s + parseFloat(b.total), 0);
 
   document.getElementById('stat-offen').textContent = offen;
   document.getElementById('stat-erledigt').textContent = erledigt;
-  document.getElementById('stat-umsatz').textContent = formatPreis(umsatz);
-  document.getElementById('stat-umsatz-label').textContent = istHeute
-    ? 'heute'
-    : new Date(datum+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  // Umsatz wird bewusst NICHT mehr in der Bestellübersicht angezeigt, damit
+  // wartende Kunden den Tagesumsatz nicht mitlesen können – er steht jetzt
+  // ausschließlich in der Buchhaltung.
   document.getElementById('neu-anzahl').textContent = (offen > 0 && istHeute) ? ` (${offen})` : '';
 
   // Filter anwenden
@@ -2790,8 +2787,12 @@ async function refreshFuerRolle(){
   if(rolle === 'admin'){
     zeigeBestellungen();
     zeigeBuchhaltung();
-    zeigeMenuAdmin();
-    zeigeEinstellungen();
+    // Re-Render der Menü-/Einstellungen-Felder überspringen, solange der Admin
+    // dort gerade tippt. Sonst überschreibt das 5‑Sekunden‑Polling die Eingabe:
+    // die Uhrzeit springt zurück und der eben getippte Beschreibungstext
+    // verschwindet. (Gleiche Schutzlogik wie im Realtime-Handler.)
+    if(!nutzerTipptIn('tab-menu'))          zeigeMenuAdmin();
+    if(!nutzerTipptIn('tab-einstellungen')) zeigeEinstellungen();
   } else if(rolle === 'kunde'){
     zeigeStatusKunde();
     zeigeMenuKunde();
