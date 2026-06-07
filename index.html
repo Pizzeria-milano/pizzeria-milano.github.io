@@ -1457,6 +1457,18 @@
       </div>
 
       <div class="setting-karte">
+        <h3>Bestellungen pro Zeitfenster begrenzen</h3>
+        <p style="font-size:13px;color:var(--grau-leise);margin-bottom:12px">
+          Maximale Anzahl Bestellungen je 15‑Minuten‑Abholfenster. Ist ein Fenster
+          ausgebucht, können Kunden diese Uhrzeit nicht mehr wählen. <strong>0 = kein Limit.</strong>
+        </p>
+        <div class="setting-row">
+          <input type="number" id="max-slot-input" min="0" step="1" placeholder="z.B. 4" style="flex:1">
+          <button class="btn-klein" onclick="speichereMaxSlot()">Speichern</button>
+        </div>
+      </div>
+
+      <div class="setting-karte">
         <h3>Maximale Pizzen pro Tag</h3>
         <p style="font-size:13px;color:var(--grau-leise);margin-bottom:12px">
           Tagesbegrenzung für die Anzahl verkaufter Pizzen (Kategorie „Pizza"). Kunden sehen live, wie viele noch verfügbar sind. <strong>0 = kein Limit.</strong>
@@ -1643,6 +1655,10 @@ async function insertOrder(order){
       await ladeAlles();
       zeigeStatusKunde();
       zeigeMenuKunde();
+    } else if(/SLOT_LIMIT_EXCEEDED/.test(error.message || '')){
+      toast('Diese Abholzeit ist leider schon ausgebucht. Bitte wähle ein anderes Zeitfenster.', 'fehler');
+      await ladeAlles();
+      aktualisiereSlotAuswahl();
     } else {
       toast('Fehler: ' + error.message, 'fehler');
     }
@@ -2011,17 +2027,13 @@ function zeigeWarenkorbModal(){
     <input type="tel" id="k-tel" placeholder="0171 1234567">
 
     <label for="k-zeit">Abholzeit *</label>
-    <select id="k-zeit">
-      ${slots.length === 0
-        ? '<option value="">Keine Zeiten verfügbar</option>'
-        : slots.map(s => `<option value="${s.iso}">${s.label}</option>`).join('')}
-    </select>
+    <select id="k-zeit">${slotOptionsHtml(slots)}</select>
 
     <label for="k-notiz">Anmerkungen (optional)</label>
     <textarea id="k-notiz" placeholder="z.B. ohne Zwiebeln, extra scharf …"></textarea>
 
     <div style="margin-top:20px">
-      <button class="btn-voll" id="best-btn" ${slots.length === 0 ? 'disabled' : ''} onclick="sendeBestellung()">
+      <button class="btn-voll" id="best-btn" ${slots.every(s => s.voll) ? 'disabled' : ''} onclick="sendeBestellung()">
         Jetzt kostenpflichtig bestellen
       </button>
     </div>
@@ -2043,14 +2055,56 @@ function erzeugeZeitSlots(){
   const restBis15 = (15 - (minuten % 15)) % 15;
   if(restBis15 > 0 || start.getSeconds() > 0) start.setMinutes(minuten + (restBis15 || 15), 0, 0);
 
+  const slotMax  = parseInt(einstellungen.max_orders_per_slot || 0, 10);
+  const belegung = belegungProSlot();
+
   const slots = [];
   for(let t = new Date(start); t <= bis; t = new Date(t.getTime() + 15*60000)){
+    const belegt = belegung.get(t.getTime()) || 0;
     slots.push({
       iso: t.toISOString(),
-      label: t.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) + ' Uhr'
+      label: t.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) + ' Uhr',
+      voll: slotMax > 0 && belegt >= slotMax
     });
   }
   return slots;
+}
+
+/* Zählt vorhandene Bestellungen je Abhol-Zeitfenster (Schlüssel: Zeitpunkt in ms). */
+function belegungProSlot(){
+  const m = new Map();
+  for(const b of bestellungen){
+    if(!b.pickup_time) continue;
+    const ms = new Date(b.pickup_time).getTime();
+    if(!Number.isFinite(ms)) continue;
+    m.set(ms, (m.get(ms) || 0) + 1);
+  }
+  return m;
+}
+
+/* Baut die <option>-Liste für die Abholzeit-Auswahl. Ausgebuchte Fenster werden
+   deaktiviert dargestellt; das erste freie Fenster ist vorausgewählt. */
+function slotOptionsHtml(slots){
+  if(slots.length === 0) return '<option value="">Keine Zeiten verfügbar</option>';
+  if(slots.every(s => s.voll)) return '<option value="">Alle Zeiten ausgebucht</option>';
+  const erstFrei = slots.findIndex(s => !s.voll);
+  return slots.map((s, i) => s.voll
+    ? `<option value="" disabled>${s.label} — ausgebucht</option>`
+    : `<option value="${s.iso}"${i === erstFrei ? ' selected' : ''}>${s.label}</option>`
+  ).join('');
+}
+
+/* Aktualisiert nur die Abholzeit-Auswahl (falls ein Fenster zwischenzeitlich
+   ausgebucht wurde) – ohne die übrigen Eingaben (Name/Telefon/Anmerkung) zu verlieren. */
+function aktualisiereSlotAuswahl(){
+  const sel = document.getElementById('k-zeit');
+  if(!sel) return;
+  const vorher = sel.value;
+  const slots = erzeugeZeitSlots();
+  sel.innerHTML = slotOptionsHtml(slots);
+  if(vorher && slots.some(s => !s.voll && s.iso === vorher)) sel.value = vorher;
+  const btn = document.getElementById('best-btn');
+  if(btn) btn.disabled = slots.every(s => s.voll); // greift auch bei 0 Slots
 }
 
 async function sendeBestellung(){
@@ -2063,21 +2117,32 @@ async function sendeBestellung(){
   if(!tel) { toast('Bitte Telefonnummer eingeben', 'fehler'); return; }
   if(!zeit){ toast('Bitte Abholzeit wählen', 'fehler'); return; }
 
-  // Kategorie-Tageslimits final prüfen (inkl. frisch synchronisierter Bestellungen)
+  // Finale Prüfung (inkl. frisch synchronisierter Bestellungen):
+  // Kategorie-Tageslimits + Bestell-Limit pro Abhol-Zeitfenster
+  const slotMax = parseInt(einstellungen.max_orders_per_slot || 0, 10);
   const limitierteKats = Object.keys(LIMIT_FELDER).filter(k => maxFuer(k) > 0);
-  if(limitierteKats.length){
+  if(limitierteKats.length || slotMax > 0){
     await ladeAlles();
-    for(const kat of limitierteKats){
-      const max  = maxFuer(kat);
-      const rest = Math.max(0, max - bestelltHeuteFuer(kat));
-      const imWK = imWarenkorbFuer(kat);
-      if(imWK > rest){
-        const label = LIMIT_FELDER[kat].label;
-        toast(rest === 0 ? `Heute sind keine ${label} mehr verfügbar` : `Nur noch ${rest} ${label} verfügbar`, 'fehler');
-        zeigeStatusKunde();
-        zeigeMenuKunde();
-        return;
-      }
+  }
+  for(const kat of limitierteKats){
+    const max  = maxFuer(kat);
+    const rest = Math.max(0, max - bestelltHeuteFuer(kat));
+    const imWK = imWarenkorbFuer(kat);
+    if(imWK > rest){
+      const label = LIMIT_FELDER[kat].label;
+      toast(rest === 0 ? `Heute sind keine ${label} mehr verfügbar` : `Nur noch ${rest} ${label} verfügbar`, 'fehler');
+      zeigeStatusKunde();
+      zeigeMenuKunde();
+      return;
+    }
+  }
+  if(slotMax > 0){
+    const zielMs = new Date(zeit).getTime();
+    const belegt = bestellungen.filter(b => b.pickup_time && new Date(b.pickup_time).getTime() === zielMs).length;
+    if(belegt >= slotMax){
+      toast('Diese Abholzeit ist leider schon ausgebucht. Bitte wähle ein anderes Zeitfenster.', 'fehler');
+      aktualisiereSlotAuswahl();
+      return;
     }
   }
 
@@ -2181,6 +2246,7 @@ function zeigeEinstellungen(){
   document.getElementById('pizzeria-tel-input').value = einstellungen.phone || '';
   document.getElementById('max-pizzas-input').value = einstellungen.max_pizzas_per_day || 0;
   document.getElementById('max-salate-input').value = einstellungen.max_salads_per_day || 0;
+  document.getElementById('max-slot-input').value = einstellungen.max_orders_per_slot || 0;
 }
 
 async function toggleOffen(){
@@ -2225,6 +2291,14 @@ async function speichereMaxSalate(){
   toast(max ? `Tages-Limit: ${max} Salate` : 'Kein Salat-Limit', 'erfolg');
   zeigeStatusKunde();
   zeigeMenuKunde();
+}
+
+async function speichereMaxSlot(){
+  const v = parseInt(document.getElementById('max-slot-input').value, 10);
+  const max = isNaN(v) || v < 0 ? 0 : v;
+  await saveSettings({ max_orders_per_slot: max });
+  document.getElementById('max-slot-input').value = max;
+  toast(max ? `Limit: ${max} Bestellung(en) pro 15 Minuten` : 'Kein Limit pro Zeitfenster', 'erfolg');
 }
 
 async function speichereKontakt(){
