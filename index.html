@@ -2064,7 +2064,8 @@ function erzeugeZeitSlots(){
     slots.push({
       iso: t.toISOString(),
       label: t.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) + ' Uhr',
-      voll: slotMax > 0 && belegt >= slotMax
+      voll: slotMax > 0 && belegt >= slotMax,
+      frei: slotMax > 0 ? Math.max(0, slotMax - belegt) : null
     });
   }
   return slots;
@@ -2090,7 +2091,7 @@ function slotOptionsHtml(slots){
   const erstFrei = slots.findIndex(s => !s.voll);
   return slots.map((s, i) => s.voll
     ? `<option value="" disabled>${s.label} — ausgebucht</option>`
-    : `<option value="${s.iso}"${i === erstFrei ? ' selected' : ''}>${s.label}</option>`
+    : `<option value="${s.iso}"${i === erstFrei ? ' selected' : ''}>${s.label}${s.frei != null ? ` — noch ${s.frei} frei` : ''}</option>`
   ).join('');
 }
 
