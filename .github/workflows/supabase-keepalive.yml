@@ -1,0 +1,33 @@
+# Hält das Supabase-Free-Projekt aktiv.
+# Supabase pausiert Free-Projekte nach 7 Tagen ohne Datenbank-Zugriffe.
+# Dieser Workflow schickt täglich eine kleine Abfrage an die Datenbank.
+# Schlägt die Abfrage fehl (z. B. Projekt pausiert), schickt GitHub eine
+# Fehler-Mail an den Repo-Besitzer.
+name: Supabase Keep-alive
+
+on:
+  schedule:
+    - cron: "17 5 * * *"   # täglich 05:17 UTC
+  workflow_dispatch:        # manuell startbar unter "Actions"
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Öffentlicher (publishable) Key, steht auch in der index.html.
+      SUPABASE_URL: https://bntkzwcndmgrqkikseko.supabase.co
+      SUPABASE_ANON_KEY: sb_publishable_un-J3e638jmQ0klhciSCHA_EohNnQQL
+    steps:
+      - name: Datenbank abfragen
+        run: |
+          code=$(curl -s -o /tmp/resp.json -w "%{http_code}" --max-time 30 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/pizzeria_settings?select=id,updated_at&limit=1")
+          echo "HTTP $code"
+          cat /tmp/resp.json; echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Supabase antwortet nicht mit 200 – Projekt evtl. pausiert. Im Supabase-Dashboard 'Restore project' klicken."
+            exit 1
+          fi
