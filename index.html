@@ -248,26 +248,6 @@
   }
   .btn-klein:hover{background:var(--sand-dunkel)}
 
-  /* Musik-Button */
-  .btn-musik{
-    display:flex;align-items:center;gap:6px;
-    background:var(--cream);transition:all .2s;
-    font-family:'Unbounded', sans-serif;letter-spacing:1px;
-    font-size:11px;text-transform:uppercase;font-weight:600;
-    color:var(--burgunder);
-  }
-  .btn-musik:hover{background:var(--sand)}
-  .btn-musik.pausiert{background:var(--grau-linie);color:var(--grau-leise)}
-  .btn-musik .musik-note{
-    display:inline-block;transition:transform .3s;
-  }
-  .btn-musik:not(.pausiert) .musik-note{
-    animation:musik-wiegen 1.2s ease-in-out infinite;
-  }
-  @keyframes musik-wiegen{
-    0%,100%{transform:rotate(-8deg)}
-    50%{transform:rotate(8deg)}
-  }
 
   /* ============================================
      KUNDEN-BEREICH
@@ -1189,7 +1169,6 @@
      KUNDEN-BEREICH
      ============================================ -->
 <div id="kunde" class="hidden">
-  <audio id="bg-musik" src="die-beste-pizza-der-welt.mp3" loop preload="auto"></audio>
   <header class="header">
     <div class="header-title">
       <svg class="header-logo" viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pizzeria Milano">
@@ -1232,9 +1211,6 @@
       </svg>
     </div>
     <div class="header-btns">
-      <button class="btn-klein btn-musik pausiert" id="musik-btn" onclick="toggleMusik()" title="Hintergrundmusik an/aus">
-        <span class="musik-note">🎵</span><span id="musik-label">Musik aus</span>
-      </button>
       <button class="btn-klein" onclick="ausloggen()">Abmelden</button>
     </div>
   </header>
@@ -1705,7 +1681,6 @@ function pruefePW(){
 }
 
 function ausloggen(){
-  stoppeMusik();
   bestellungenGesehen();
   if(realtimeKanal){ sb.removeChannel(realtimeKanal); realtimeKanal = null; }
   if(realtimeReconnectTimer){ clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
@@ -1732,53 +1707,8 @@ async function starteKunde(){
   zeigeStatusKunde();
   zeigeMenuKunde();
   updateWarenkorbAnzeige();
-  setzeMusikButton(true);
   starteRealtime('kunde');
   startePolling();
-}
-
-/* ============================================================
-   HINTERGRUNDMUSIK
-   ============================================================ */
-function starteMusik(){
-  const a = document.getElementById('bg-musik');
-  if(!a) return;
-  a.volume = 0.08;          // sehr dezent im Hintergrund
-  const p = a.play();
-  if(p && typeof p.catch === 'function'){
-    p.catch(() => {
-      // Browser hat Autoplay blockiert – Button-Zustand zeigt Pausiert
-      setzeMusikButton(true);
-    });
-  }
-  setzeMusikButton(a.paused);
-}
-
-function toggleMusik(){
-  const a = document.getElementById('bg-musik');
-  if(!a) return;
-  if(a.paused){
-    a.play().catch(() => {});
-    setzeMusikButton(false);
-  } else {
-    a.pause();
-    setzeMusikButton(true);
-  }
-}
-
-function stoppeMusik(){
-  const a = document.getElementById('bg-musik');
-  if(!a) return;
-  a.pause();
-  a.currentTime = 0;
-}
-
-function setzeMusikButton(pausiert){
-  const btn = document.getElementById('musik-btn');
-  const lbl = document.getElementById('musik-label');
-  if(!btn || !lbl) return;
-  btn.classList.toggle('pausiert', pausiert);
-  lbl.textContent = pausiert ? 'Musik aus' : 'Musik';
 }
 
 function renderRestBadge(elementId, kategorie, icon, offen){
@@ -2195,7 +2125,6 @@ async function sendeBestellung(){
    ADMIN
    ============================================================ */
 async function starteAdmin(){
-  stoppeMusik();
   bestellungenGesehen();
   document.getElementById('login').classList.add('hidden');
   document.getElementById('kunde').classList.add('hidden');
