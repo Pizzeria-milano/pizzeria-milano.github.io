@@ -2053,7 +2053,9 @@ async function sendeBestellung(){
   const slotMax = parseInt(einstellungen.max_orders_per_slot || 0, 10);
   const limitierteKats = Object.keys(LIMIT_FELDER).filter(k => maxFuer(k) > 0);
   if(limitierteKats.length || slotMax > 0){
-    await ladeAlles();
+    // Nur die Bestellungen holen: die Limits rechnen sich aus
+    // bestellungen + einstellungen, das Menü wird dafür nicht gebraucht.
+    await ladeNurBestellungen();
   }
   for(const kat of limitierteKats){
     const max  = maxFuer(kat);
@@ -2307,6 +2309,8 @@ async function bildHochladen(id, ev){
     const item = menu.find(m => m.id === id);
     if(!item) return;
     item.image = dataUrl;
+    menuBilder[id] = dataUrl;   // Cache mitführen, sonst faellt das Bild
+                                // beim naechsten schlanken Menue-Laden weg
     await upsertMenuItem(item);
     zeigeMenuAdmin();
     toast('Bild hinzugefügt','erfolg');
@@ -2322,6 +2326,7 @@ async function bildLoeschen(id){
   if(!item) return;
   if(!confirm(`Bild von "${item.name}" entfernen?`)) return;
   item.image = null;
+  delete menuBilder[id];       // Cache mitführen
   await upsertMenuItem(item);
   zeigeMenuAdmin();
   toast('Bild entfernt','erfolg');
@@ -2699,23 +2704,115 @@ async function demoReset(){
 }
 
 /* ============================================================
-   LADE-FUNKTION (async, lädt aus Supabase)
+   LADE-FUNKTIONEN (async, lädt aus Supabase)
+
+   WICHTIG fürs Datenvolumen: Die Menü-Bilder liegen als Base64-
+   Data-URL in der Spalte "image" (siehe bildHochladen()). Ein
+   "select *" auf pizzeria_menu zieht deshalb jedes Mal sämtliche
+   Bilder über die Leitung. Als das noch im 5-Sekunden-Polling hing,
+   kamen dabei zweistellige Gigabyte pro Monat zusammen.
+
+   Deshalb gilt jetzt:
+   - Das Polling lädt NUR die Bestellungen (ladeNurBestellungen).
+   - Die Menü-Liste wird ohne die Bild-Spalte geladen (MENU_SPALTEN).
+   - Die Bilder liegen im Cache menuBilder und werden nur beim
+     Anmelden sowie bei echten Menü-Änderungen neu geholt.
+   Gerendert wird unverändert alles – gespart wird nur Netzwerk.
    ============================================================ */
 let letzterSyncMs = 0;
 let letzterSyncOK = true;
+
+/* Menü-Spalten OHNE "image" – die Bilder kommen aus dem Cache. */
+const MENU_SPALTEN = 'id,category,name,description,price,available,sort_order';
+
+/* Bild-Cache: Menü-ID -> Data-URL. Überlebt die schlanken Ladungen. */
+let menuBilder = {};
+
+/* Hängt die gecachten Bilder wieder an die Menü-Zeilen. */
+function mitBildern(zeilen){
+  return zeilen.map(m => ({ ...m, image: menuBilder[m.id] ?? null }));
+}
+
+function syncNotieren(...fehler){
+  letzterSyncMs = Date.now();
+  letzterSyncOK = !fehler.some(Boolean);
+  aktualisiereSyncIndikator();
+}
+
+async function holeSettings(){
+  const { data, error } = await sb.from(T_SETTINGS).select('*').eq('id', 1).single();
+  if(data) einstellungen = data;
+  return error;
+}
+
+/* Menü ohne Bilder – klein genug für häufige Aufrufe. */
+async function holeMenu(){
+  const { data, error } = await sb.from(T_MENU)
+    .select(MENU_SPALTEN).order('sort_order', { ascending: true });
+  if(data) menu = mitBildern(data);
+  return error;
+}
+
+/* Bilder separat – nur beim Anmelden und bei Menü-Änderungen. */
+async function holeMenuBilder(){
+  const { data, error } = await sb.from(T_MENU).select('id,image');
+  if(data){
+    menuBilder = {};
+    for(const z of data){ if(z.image) menuBilder[z.id] = z.image; }
+    menu = mitBildern(menu);
+  }
+  return error;
+}
+
+async function holeBestellungen(){
+  const { data, error } = await sb.from(T_ORDERS)
+    .select('*').order('created_at', { ascending: false });
+  if(data) bestellungen = data;
+  return error;
+}
+
+/* Vollständig – beim Anmelden, nach Verbindungsabriss, nach Menü-Pflege. */
 async function ladeAlles(){
   try{
-    const [sR, mR, bR] = await Promise.all([
-      sb.from(T_SETTINGS).select('*').eq('id', 1).single(),
-      sb.from(T_MENU).select('*').order('sort_order', { ascending: true }),
-      sb.from(T_ORDERS).select('*').order('created_at', { ascending: false })
-    ]);
-    if(sR.data) einstellungen = sR.data;
-    if(mR.data) menu = mR.data;
-    if(bR.data) bestellungen = bR.data;
-    letzterSyncMs = Date.now();
-    letzterSyncOK = !(sR.error || mR.error || bR.error);
+    const [sF, bF] = await Promise.all([holeSettings(), holeBestellungen()]);
+    const biF = await holeMenuBilder();   // erst Cache füllen,
+    const mF  = await holeMenu();         // dann Liste daraus bestücken
+    syncNotieren(sF, bF, biF, mF);
+  } catch(e){
+    letzterSyncOK = false;
     aktualisiereSyncIndikator();
+    throw e;
+  }
+}
+
+/* Nur Bestellungen – das ist der Pfad, den das Polling nimmt. */
+async function ladeNurBestellungen(){
+  try{
+    syncNotieren(await holeBestellungen());
+  } catch(e){
+    letzterSyncOK = false;
+    aktualisiereSyncIndikator();
+    throw e;
+  }
+}
+
+/* Nur Einstellungen – für das Settings-Realtime-Event. */
+async function ladeNurSettings(){
+  try{
+    syncNotieren(await holeSettings());
+  } catch(e){
+    letzterSyncOK = false;
+    aktualisiereSyncIndikator();
+    throw e;
+  }
+}
+
+/* Menü inkl. Bilder – für das Menü-Realtime-Event. */
+async function ladeNurMenu(){
+  try{
+    const biF = await holeMenuBilder();
+    const mF  = await holeMenu();
+    syncNotieren(biF, mF);
   } catch(e){
     letzterSyncOK = false;
     aktualisiereSyncIndikator();
@@ -2736,7 +2833,7 @@ function starteRealtime(rolle){
   if(realtimeReconnectTimer){ clearTimeout(realtimeReconnectTimer); realtimeReconnectTimer = null; }
   realtimeKanal = sb.channel('pizzeria-' + rolle)
     .on('postgres_changes', { event: '*', schema: 'public', table: T_SETTINGS }, async () => {
-      await ladeAlles();
+      await ladeNurSettings();
       if(rolle === 'kunde'){ zeigeStatusKunde(); zeigeMenuKunde(); updateWarenkorbAnzeige(); }
       else {
         // Re-Render skippen, wenn Admin gerade in einem Einstellungen-Feld tippt
@@ -2744,7 +2841,7 @@ function starteRealtime(rolle){
       }
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: T_MENU }, async () => {
-      await ladeAlles();
+      await ladeNurMenu();
       if(rolle === 'kunde'){ zeigeMenuKunde(); }
       else {
         // Re-Render skippen, wenn Admin gerade in einem Menü-Feld tippt
@@ -2752,7 +2849,7 @@ function starteRealtime(rolle){
       }
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: T_ORDERS }, async (payload) => {
-      await ladeAlles();
+      await ladeNurBestellungen();
       if(rolle === 'admin'){
         if(payload.eventType === 'INSERT'){
           tonPling();
@@ -2777,17 +2874,19 @@ function starteRealtime(rolle){
           if(r === aktiveRolle) starteRealtime(aktiveRolle);
         }, 3000);
       } else if(status === 'SUBSCRIBED'){
-        // Nach erfolgreichem (Re-)Connect Daten frisch ziehen, damit
+        // Nach erfolgreichem (Re-)Connect alles frisch ziehen, damit
         // verpasste Events während des Ausfalls nachgeladen werden.
-        refreshFuerRolle().catch(() => {});
+        refreshFuerRolle(true).catch(() => {});
       }
     });
 }
 
-async function refreshFuerRolle(){
+async function refreshFuerRolle(voll = false){
   const rolle = sessionStorage.getItem('rolle');
   if(!rolle) return;
-  await ladeAlles();
+  // Der Regelfall (5-Sekunden-Polling) holt nur die Bestellungen.
+  // Menü und Einstellungen kommen über Realtime, wenn sie sich ändern.
+  if(voll) await ladeAlles(); else await ladeNurBestellungen();
   if(rolle === 'admin'){
     zeigeBestellungen();
     zeigeBuchhaltung();
