@@ -1353,7 +1353,7 @@
 
       <div class="best-datum-wrap">
         <label for="buch-datum">Datum:</label>
-        <input type="date" id="buch-datum" onchange="zeigeBuchhaltung()">
+        <input type="date" id="buch-datum" onchange="aendereBuchDatum()">
         <button class="btn-klein best-datum-heute" onclick="setzeBuchDatumHeute()">Heute</button>
       </div>
 
@@ -1645,7 +1645,10 @@ async function insertOrder(order){
 
 async function updateOrder(id, patch){
   const { error } = await sb.from(T_ORDERS).update(patch).eq('id', id);
-  if(error) toast('Fehler: ' + error.message, 'fehler');
+  if(error){ toast('Fehler: ' + error.message, 'fehler'); return; }
+  // Auch nachgeladene Archiv-Tage aktuell halten: dorthin liefern
+  // weder Realtime noch Polling Aktualisierungen.
+  patcheBestellungLokal(id, patch);
 }
 
 /* --- State --- */
@@ -2462,6 +2465,9 @@ function gewaehltesBestDatum(){
 }
 
 function bestellungenFuerDatum(datumIso){
+  // Tage ausserhalb des Ladefensters kommen aus dem Archiv,
+  // das stelleTagBereit() bei der Datumswahl gefuellt hat.
+  if(!imLadefenster(datumIso)) return bestellungenArchiv[datumIso] || [];
   const start = new Date(datumIso + 'T00:00:00');
   const ende  = new Date(start.getTime() + 24*60*60*1000);
   return bestellungen.filter(b => {
@@ -2470,7 +2476,8 @@ function bestellungenFuerDatum(datumIso){
   });
 }
 
-function aendereBestDatum(){
+async function aendereBestDatum(){
+  await stelleTagBereit(gewaehltesBestDatum());
   zeigeBestellungen();
 }
 
@@ -2572,6 +2579,11 @@ function gewaehltesBuchDatum(){
   return (el && el.value) ? el.value : heutigesDatumISO();
 }
 
+async function aendereBuchDatum(){
+  await stelleTagBereit(gewaehltesBuchDatum());
+  zeigeBuchhaltung();
+}
+
 function setzeBuchDatumHeute(){
   const el = document.getElementById('buch-datum');
   if(el){ el.value = heutigesDatumISO(); zeigeBuchhaltung(); }
@@ -2654,7 +2666,7 @@ function zeigeBuchhaltung(){
 }
 
 async function updateStatus(id, neuerStatus){
-  const b = bestellungen.find(x => x.id === id);
+  const b = findeBestellung(id);
   if(!b) return;
   b.status = neuerStatus;
   await updateOrder(id, { status: neuerStatus });
@@ -2662,7 +2674,7 @@ async function updateStatus(id, neuerStatus){
 }
 
 async function loescheBestellung(id){
-  const b = bestellungen.find(x => x.id === id);
+  const b = findeBestellung(id);
   if(!b) return;
   const nr = b.id.substring(0,8).toUpperCase();
   const items = (Array.isArray(b.items) ? b.items : [])
@@ -2677,15 +2689,15 @@ async function loescheBestellung(id){
   }
   // Lokal aus der Liste nehmen, damit die UI nicht auf den Realtime-/Polling-
   // Roundtrip warten muss; ladeAlles würde dasselbe Ergebnis liefern.
-  const idx = bestellungen.findIndex(x => x.id === id);
-  if(idx !== -1) bestellungen.splice(idx, 1);
+  // Nachgeladene Archiv-Tage muessen mit aufgeraeumt werden.
+  entferneBestellungLokal(id);
   zeigeBestellungen();
   zeigeBuchhaltung();
   toast(`Bestellung #${nr} gelöscht – Kontingent freigegeben`, 'erfolg');
 }
 
 async function togglePaid(id){
-  const b = bestellungen.find(x => x.id === id);
+  const b = findeBestellung(id);
   if(!b) return;
   b.paid = !b.paid;
   await updateOrder(id, { paid: b.paid });
@@ -2764,11 +2776,80 @@ async function holeMenuBilder(){
   return error;
 }
 
+/* Wie viele Tage der laufende Betrieb vorhaelt (heute + die Tage davor).
+   Alles Aeltere wird nur auf Anfrage geholt - siehe stelleTagBereit().
+   Ohne dieses Fenster zog jede Poll-Abfrage den kompletten Bestell-
+   Bestand, der mit jedem Betriebstag weiter waechst. */
+const HISTORIE_TAGE = 3;
+
+/* Nachgeladene aeltere Tage: '2026-08-14' -> [Bestellungen]. */
+let bestellungenArchiv = {};
+
+function ladefensterStart(){
+  const d = new Date(heutigesDatumISO() + 'T00:00:00');
+  d.setDate(d.getDate() - (HISTORIE_TAGE - 1));
+  return d;
+}
+
+function imLadefenster(datumIso){
+  return new Date(datumIso + 'T00:00:00') >= ladefensterStart();
+}
+
 async function holeBestellungen(){
   const { data, error } = await sb.from(T_ORDERS)
-    .select('*').order('created_at', { ascending: false });
+    .select('*')
+    .gte('created_at', ladefensterStart().toISOString())
+    .order('created_at', { ascending: false });
   if(data) bestellungen = data;
   return error;
+}
+
+/* Holt einen einzelnen aelteren Tag nach und legt ihn ins Archiv.
+   Tage innerhalb des Ladefensters sind ohnehin da - dann passiert nichts. */
+async function stelleTagBereit(datumIso){
+  if(imLadefenster(datumIso)) return;
+  if(bestellungenArchiv[datumIso]) return;
+  const start = new Date(datumIso + 'T00:00:00');
+  const ende  = new Date(start.getTime() + 24*60*60*1000);
+  const { data, error } = await sb.from(T_ORDERS)
+    .select('*')
+    .gte('created_at', start.toISOString())
+    .lt('created_at',  ende.toISOString())
+    .order('created_at', { ascending: false });
+  if(error){ toast('Tag konnte nicht geladen werden: ' + error.message, 'fehler'); return; }
+  bestellungenArchiv[datumIso] = data || [];
+}
+
+/* Haelt geaenderte Bestellungen auch in nachgeladenen Tagen aktuell -
+   dort kommt weder Realtime noch Polling an. */
+function patcheBestellungLokal(id, patch){
+  const b = bestellungen.find(x => x.id === id);
+  if(b) Object.assign(b, patch);
+  for(const tag of Object.keys(bestellungenArchiv)){
+    const a = bestellungenArchiv[tag].find(x => x.id === id);
+    if(a) Object.assign(a, patch);
+  }
+}
+
+/* Sucht eine Bestellung im Ladefenster und in den nachgeladenen Tagen,
+   damit Status/Bezahlt/Loeschen auch auf aelteren Tagen funktionieren. */
+function findeBestellung(id){
+  const b = bestellungen.find(x => x.id === id);
+  if(b) return b;
+  for(const tag of Object.keys(bestellungenArchiv)){
+    const a = bestellungenArchiv[tag].find(x => x.id === id);
+    if(a) return a;
+  }
+  return null;
+}
+
+function entferneBestellungLokal(id){
+  const i = bestellungen.findIndex(x => x.id === id);
+  if(i >= 0) bestellungen.splice(i, 1);
+  for(const tag of Object.keys(bestellungenArchiv)){
+    const j = bestellungenArchiv[tag].findIndex(x => x.id === id);
+    if(j >= 0) bestellungenArchiv[tag].splice(j, 1);
+  }
 }
 
 /* Vollständig – beim Anmelden, nach Verbindungsabriss, nach Menü-Pflege. */
