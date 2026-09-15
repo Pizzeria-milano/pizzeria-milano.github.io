@@ -1504,6 +1504,21 @@
         </p>
       </div>
 
+      <div class="setting-karte">
+        <h3>🖼️ Speisen-Bilder in den Storage verschieben</h3>
+        <p style="font-size:13px;color:var(--grau-leise);margin-bottom:12px">
+          Bilder, die noch direkt in der Datenbank liegen, werden in den
+          Storage verschoben. Sie sehen danach genauso aus, werden aber vom
+          Browser zwischengespeichert – das spart bei jedem weiteren Besuch
+          Datenvolumen. Der Vorgang ist einmalig; ein zweiter Klick findet
+          nichts mehr zu tun.
+        </p>
+        <div class="setting-row">
+          <button class="btn-klein" id="bild-migration-btn" onclick="migriereBilderInStorage()">Jetzt verschieben</button>
+        </div>
+        <p style="font-size:12px;color:var(--grau-leise);margin-top:8px" id="bild-migration-info"></p>
+      </div>
+
       <div class="demo-reset">
         <h3>🧪 Demo-Daten zurücksetzen</h3>
         <p>Löscht alle Bestellungen, Einstellungen und Pizzen und legt die Demo-Daten neu an.</p>
@@ -1562,6 +1577,11 @@ const T_SETTINGS = 'pizzeria_settings';
 const T_MENU     = 'pizzeria_menu';
 const T_ORDERS   = 'pizzeria_orders';
 const T_PUSH     = 'pizzeria_push_subscriptions';
+
+/* Storage-Bucket fuer die Speisen-Bilder.
+   Muss im Supabase-Dashboard als OEFFENTLICHER Bucket angelegt sein -
+   siehe supabase-storage-setup.sql im Repo. */
+const BILD_BUCKET = 'menu-bilder';
 
 /* VAPID Public Key für Web Push (gehört zur Edge Function notify-admin).
    Public Key ist absichtlich öffentlich – die Authentizität wird über den
@@ -2299,7 +2319,7 @@ function oeffneDateiDialog(id){
   document.getElementById('file-' + id).click();
 }
 
-/* Lädt Bild hoch, komprimiert es und speichert Base64 */
+/* Komprimiert das Bild, legt es im Storage ab und merkt sich die URL */
 async function bildHochladen(id, ev){
   const datei = ev.target.files && ev.target.files[0];
   if(!datei) return;
@@ -2308,11 +2328,12 @@ async function bildHochladen(id, ev){
   }
   try{
     toast('Bild wird verarbeitet…');
-    const dataUrl = await komprimiereBild(datei, 600, 0.82);
+    const blob = await komprimiereBild(datei, 600, 0.82);
     const item = menu.find(m => m.id === id);
     if(!item) return;
-    item.image = dataUrl;
-    menuBilder[id] = dataUrl;   // Cache mitführen, sonst faellt das Bild
+    const url = await speichereBildInStorage(id, blob);
+    item.image = url;
+    menuBilder[id] = url;       // Cache mitführen, sonst faellt das Bild
                                 // beim naechsten schlanken Menue-Laden weg
     await upsertMenuItem(item);
     zeigeMenuAdmin();
@@ -2328,6 +2349,8 @@ async function bildLoeschen(id){
   const item = menu.find(m => m.id === id);
   if(!item) return;
   if(!confirm(`Bild von "${item.name}" entfernen?`)) return;
+  // Nur Storage-Bilder haben eine Datei; alte Base64-Eintraege nicht.
+  if(istStorageBild(item.image)) await loescheBildAusStorage(id);
   item.image = null;
   delete menuBilder[id];       // Cache mitführen
   await upsertMenuItem(item);
@@ -2335,7 +2358,59 @@ async function bildLoeschen(id){
   toast('Bild entfernt','erfolg');
 }
 
-/* Komprimiert ein Bild clientseitig auf max. Breite + JPEG-Qualität */
+/* ============================================================
+   EINMALIGE MIGRATION: Base64 aus der Datenbank in den Storage
+   ============================================================ */
+async function migriereBilderInStorage(){
+  const knopf = document.getElementById('bild-migration-btn');
+  const info  = document.getElementById('bild-migration-info');
+  const melde = (txt) => { if(info) info.textContent = txt; };
+
+  const { data, error } = await sb.from(T_MENU).select('id,name,image');
+  if(error){ melde('Konnte das Menü nicht lesen: ' + error.message); return; }
+
+  const offen = (data || []).filter(z => typeof z.image === 'string' && z.image.startsWith('data:'));
+  if(offen.length === 0){
+    melde('Nichts zu tun – es liegen keine Bilder mehr in der Datenbank.');
+    return;
+  }
+  if(!confirm(`${offen.length} Bild(er) in den Storage verschieben?\n\n`
+            + `Die Bilder bleiben unverändert sichtbar, sie liegen danach nur `
+            + `woanders und werden vom Browser zwischengespeichert.`)) return;
+
+  if(knopf) knopf.disabled = true;
+  let fertig = 0, misslungen = 0;
+
+  for(const zeile of offen){
+    melde(`Verschiebe ${fertig + misslungen + 1} von ${offen.length}: ${zeile.name}…`);
+    try{
+      const blob = await (await fetch(zeile.image)).blob();
+      const url  = await speichereBildInStorage(zeile.id, blob);
+      const { error: schreibFehler } = await sb.from(T_MENU)
+        .update({ image: url }).eq('id', zeile.id);
+      if(schreibFehler) throw new Error(schreibFehler.message);
+      menuBilder[zeile.id] = url;
+      fertig++;
+    } catch(e){
+      console.error('Migration fehlgeschlagen für', zeile.name, e);
+      misslungen++;
+    }
+  }
+
+  if(knopf) knopf.disabled = false;
+  await ladeAlles();
+  zeigeMenuAdmin();
+  melde(misslungen === 0
+    ? `Fertig – ${fertig} Bild(er) liegen jetzt im Storage.`
+    : `${fertig} verschoben, ${misslungen} fehlgeschlagen. Details in der Browser-Konsole.`);
+  toast(misslungen === 0 ? 'Bilder verschoben' : 'Teilweise fehlgeschlagen',
+        misslungen === 0 ? 'erfolg' : 'fehler');
+}
+
+/* Komprimiert ein Bild clientseitig auf max. Breite + JPEG-Qualität.
+   Liefert einen Blob – der geht direkt in den Storage. Frueher war das
+   eine Base64-Data-URL, die in der Datenbank landete; siehe
+   speichereBildInStorage() fuer den Grund des Wechsels. */
 function komprimiereBild(datei, maxBreite, qualitaet){
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2352,12 +2427,60 @@ function komprimiereBild(datei, maxBreite, qualitaet){
         ctx.fillStyle = '#fff'; // bei transparenten PNGs weiß unterlegen
         ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', qualitaet));
+        canvas.toBlob(
+          b => b ? resolve(b) : reject(new Error('Bild konnte nicht umgewandelt werden')),
+          'image/jpeg', qualitaet
+        );
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(datei);
   });
+}
+
+/* ============================================================
+   SPEISEN-BILDER IM STORAGE
+
+   Frueher lagen die Bilder als Base64-Data-URL in der Spalte
+   pizzeria_menu.image. Das hatte zwei Nachteile: Sie gingen bei jeder
+   Menue-Abfrage komplett ueber die API, und ein Browser kann sie nicht
+   cachen – jeder Seitenaufruf uebertrug sie neu.
+
+   Jetzt liegen sie als Dateien im Storage-Bucket BILD_BUCKET und die
+   Spalte image haelt nur noch deren URL (rund 120 Zeichen). Der Browser
+   und das CDN cachen die Dateien ein Jahr lang; ein zweiter Besuch
+   kostet keinen Traffic mehr.
+
+   Beim Anzeigen macht das keinen Unterschied: <img src="..."> versteht
+   beides. Alte Base64-Eintraege funktionieren also weiter, bis sie ueber
+   migriereBilderInStorage() umgezogen sind.
+   ============================================================ */
+
+function istStorageBild(wert){
+  return typeof wert === 'string' && !wert.startsWith('data:');
+}
+
+function bildPfad(id){ return String(id) + '.jpg'; }
+
+/* Legt das Bild im Storage ab und gibt die oeffentliche URL zurueck.
+   Der Versions-Parameter bricht den Browser-Cache auf, wenn dasselbe
+   Gericht ein neues Bild bekommt. */
+async function speichereBildInStorage(id, blob){
+  const pfad = bildPfad(id);
+  const { error } = await sb.storage.from(BILD_BUCKET).upload(pfad, blob, {
+    upsert: true,
+    contentType: 'image/jpeg',
+    cacheControl: '31536000'   // ein Jahr
+  });
+  if(error) throw new Error(error.message);
+  const { data } = sb.storage.from(BILD_BUCKET).getPublicUrl(pfad);
+  return data.publicUrl + '?v=' + Date.now();
+}
+
+async function loescheBildAusStorage(id){
+  const { error } = await sb.storage.from(BILD_BUCKET).remove([bildPfad(id)]);
+  // Fehlt die Datei schon, ist das kein Grund zum Abbruch.
+  if(error) console.warn('Storage-Datei nicht entfernt:', error.message);
 }
 
 /* --- Menü verwalten --- */
