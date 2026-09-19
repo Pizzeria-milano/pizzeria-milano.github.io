@@ -27,7 +27,11 @@ jobs:
             "$SUPABASE_URL/rest/v1/pizzeria_settings?select=id,updated_at&limit=1")
           echo "HTTP $code"
           cat /tmp/resp.json; echo
+          if [ "$code" = "402" ]; then
+            echo "::error::HTTP 402 – EGRESS-KONTINGENT AUFGEBRAUCHT. Das Projekt laeuft (Status bleibt ACTIVE_HEALTHY), aber jede Daten- und Storage-Abfrage wird gesperrt: die Seite laedt, bleibt aber ohne Speisekarte. Die Sperre gilt organisationsweit und wird NUR durch ein Upgrade oder den naechsten Abrechnungszyklus aufgehoben. Vorher pruefen, was den Egress treibt (Dashboard > Usage > Total Egress)."
+            exit 1
+          fi
           if [ "$code" != "200" ]; then
-            echo "::error::Supabase antwortet nicht mit 200 – Projekt evtl. pausiert. Im Supabase-Dashboard 'Restore project' klicken."
+            echo "::error::Supabase antwortet mit HTTP $code statt 200 – Projekt evtl. pausiert. Im Supabase-Dashboard 'Restore project' klicken."
             exit 1
           fi
