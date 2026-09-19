@@ -16,8 +16,8 @@ jobs:
     timeout-minutes: 5
     env:
       # Öffentlicher (publishable) Key, steht auch in der index.html.
-      SUPABASE_URL: https://bntkzwcndmgrqkikseko.supabase.co
-      SUPABASE_ANON_KEY: sb_publishable_un-J3e638jmQ0klhciSCHA_EohNnQQL
+      SUPABASE_URL: https://qancstbmabexmmimkxcp.supabase.co
+      SUPABASE_ANON_KEY: sb_publishable_v4NB9qhAGPSli1zUjJtvug_F9iPDzBj
     steps:
       - name: Datenbank abfragen
         run: |

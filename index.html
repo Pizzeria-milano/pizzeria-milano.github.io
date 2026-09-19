@@ -1568,8 +1568,8 @@ const PW_ADMIN = 'Verwaltung';
 /* ============================================================
    SUPABASE-VERBINDUNG
    ============================================================ */
-const SUPABASE_URL     = 'https://bntkzwcndmgrqkikseko.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_un-J3e638jmQ0klhciSCHA_EohNnQQL';
+const SUPABASE_URL     = 'https://qancstbmabexmmimkxcp.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_v4NB9qhAGPSli1zUjJtvug_F9iPDzBj';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* Tabellen-Namen (mit Prefix, weil geteilte DB) */
@@ -3107,8 +3107,15 @@ async function refreshFuerRolle(voll = false){
   }
 }
 
-/* Polling: lädt alle 5 s neu. Greift nur wenn das Fenster sichtbar ist,
-   damit im Hintergrund keine Anfragen mehr rauslaufen. */
+/* Polling ist nur das Sicherheitsnetz hinter Realtime. Es lief lange auf
+   5 s, weil die Realtime-Publication `supabase_realtime` im alten Projekt
+   LEER war: postgres_changes feuerte nie, das Polling machte die gesamte
+   Synchronisation. Im neuen Projekt sind pizzeria_settings, _menu und
+   _orders eingetragen und Events sind verifiziert - deshalb reichen hier
+   60 s, um verpasste Events nach einem kurzen Verbindungsabriss
+   nachzuholen. Greift nur bei sichtbarem Fenster, damit im Hintergrund
+   keine Anfragen rauslaufen. */
+const POLL_INTERVALL_MS = 60000;
 let pollingTimer = null;
 function startePolling(){
   if(pollingTimer) clearInterval(pollingTimer);
@@ -3116,7 +3123,7 @@ function startePolling(){
     if(document.visibilityState !== 'visible') return;
     if(!sessionStorage.getItem('rolle')) return;
     refreshFuerRolle().catch(() => {});
-  }, 5000);
+  }, POLL_INTERVALL_MS);
 }
 function stoppePolling(){
   if(pollingTimer){ clearInterval(pollingTimer); pollingTimer = null; }
