@@ -1,14 +1,20 @@
 # Hält das Supabase-Free-Projekt aktiv.
-# Supabase pausiert Free-Projekte nach 7 Tagen ohne Datenbank-Zugriffe.
-# Dieser Workflow schickt täglich eine kleine Abfrage an die Datenbank.
+# Supabase pausiert Free-Projekte nach 7 Tagen mit zu wenig Datenbank-Aktivität.
+# Eine einzelne Lese-Abfrage pro Tag hat NICHT gereicht (Warn-Mail am 2026-09-29
+# trotz täglich grüner Läufe). Deshalb jetzt 4x täglich, und zwar mit einem
+# echten Schreibzugriff über die RPC keepalive_ping() (Tabelle public.keepalive).
 # Schlägt die Abfrage fehl (z. B. Projekt pausiert), schickt GitHub eine
 # Fehler-Mail an den Repo-Besitzer.
 name: Supabase Keep-alive
 
 on:
   schedule:
-    - cron: "17 5 * * *"   # täglich 05:17 UTC
+    - cron: "17 1,7,13,19 * * *"   # 4x täglich (UTC)
   workflow_dispatch:        # manuell startbar unter "Actions"
+
+permissions:
+  actions: write   # für das Selbst-Reaktivieren (siehe letzter Schritt)
+  contents: read
 
 jobs:
   ping:
@@ -19,6 +25,18 @@ jobs:
       SUPABASE_URL: https://qancstbmabexmmimkxcp.supabase.co
       SUPABASE_ANON_KEY: sb_publishable_v4NB9qhAGPSli1zUjJtvug_F9iPDzBj
     steps:
+      - name: Heartbeat schreiben
+        run: |
+          code=$(curl -s -o /tmp/hb.json -w "%{http_code}" --max-time 30 -X POST \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" -d '{}' \
+            "$SUPABASE_URL/rest/v1/rpc/keepalive_ping")
+          echo "HTTP $code"
+          cat /tmp/hb.json; echo
+          # Fehler hier nur melden; die Diagnose (402 vs. pausiert) macht der nächste Schritt.
+          [ "$code" = "200" ] || echo "::warning::Heartbeat-RPC antwortet mit HTTP $code"
+
       - name: Datenbank abfragen
         run: |
           code=$(curl -s -o /tmp/resp.json -w "%{http_code}" --max-time 30 \
@@ -35,3 +53,11 @@ jobs:
             echo "::error::Supabase antwortet mit HTTP $code statt 200 – Projekt evtl. pausiert. Im Supabase-Dashboard 'Restore project' klicken."
             exit 1
           fi
+
+      # GitHub deaktiviert Cron-Workflows, wenn im Repo 60 Tage lang nichts
+      # committet wurde. Das erneute "enable" setzt diesen Zähler zurück.
+      - name: Workflow aktiv halten
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable supabase-keepalive.yml --repo "$GITHUB_REPOSITORY"
